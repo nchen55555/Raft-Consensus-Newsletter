@@ -1,0 +1,53 @@
+{
+  "currentTerm": 136,
+  "votedFor": "replica3",
+  "log": [
+    {
+      "term": 3,
+      "operation": "CREATE_ACCOUNT",
+      "params": [
+        "Nicole Chen",
+        "nchen55555@gmail.com",
+        "12345678"
+      ]
+    },
+    {
+      "term": 3,
+      "operation": "CREATE_ACCOUNT",
+      "params": [
+        "Chris Kim",
+        "nicole@paraform.com",
+        "12345678"
+      ]
+    },
+    {
+      "term": 3,
+      "operation": "SUBSCRIBE",
+      "params": [
+        "christopher@gmail.com"
+      ]
+    },
+    {
+      "term": 78,
+      "operation": "CREATE_POST",
+      "params": [
+        "c76854d1-f2a3-465f-bf61-3a0d3dcf7b78",
+        "Test",
+        "Hi!",
+        "nchen55555@gmail.com",
+        "2025-04-24T21:55:18.794235"
+      ]
+    },
+    {
+      "term": 90,
+      "operation": "CREATE_POST",
+      "params": [
+        "83dae7e6-920f-4ffd-8043-5d9f01c9b015",
+        "TEST",
+        "HI",
+        "nchen55555@gmail.com",
+        "2025-04-24T22:12:43.917214"
+      ]
+    }
+  ]
+}
