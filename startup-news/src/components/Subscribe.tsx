@@ -3,7 +3,7 @@ import { Input } from 'antd';
 import { UserOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 
-export default function Subscribe() {
+export default function Subscribe({ onSubscribed }: { onSubscribed?: (email: string) => void }) {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
@@ -17,7 +17,11 @@ export default function Subscribe() {
         })
       });
       const result = await res.json();
-      if (result.success) setSubscribed(true);
+      if (result.success) {
+        setSubscribed(true);
+        sessionStorage.setItem('startupnews_email', email);
+        if (onSubscribed) onSubscribed(email);
+      }
       else alert("Subscription failed: " + result.error);
     } catch (err) {
       console.error(err);

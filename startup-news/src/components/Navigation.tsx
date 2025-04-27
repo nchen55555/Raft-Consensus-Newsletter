@@ -23,16 +23,12 @@ export default function Navigation() {
       label: 'About',
       children: [
         {
-          key: 'who',
-          label: <Link href="/who">Contributors</Link>,
-        },
-        {
           key: 'apply',
           label: <Link href="/apply">Apply to Contribute</Link>,
         },
         {
           key: 'login',
-          label: <Link href="/login">Login</Link>,
+          label: <Link href="/login">Contribute</Link>,
         },      
       ],
     },
@@ -49,10 +45,11 @@ export default function Navigation() {
         mode="horizontal"
         selectedKeys={[pathname]}
         items={menuItems}
-        className="bg-transparent border-none font-medium text-lg"
+        className="bg-transparent border-none font-medium text-lg font-sans"
         style={{
           display: 'flex',
           justifyContent: 'flex-start',
+          fontFamily: 'inherit', // fallback to app's font
         }}
       />
     </motion.div>

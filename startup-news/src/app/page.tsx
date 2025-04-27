@@ -55,6 +55,21 @@ export default function Blog() {
         </motion.div>
       </motion.div>
 
+      {/* Newsletter Section */}
+      <motion.div 
+        className="py-20 bg-black text-white"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        transition={{ duration: 0.8 }}
+        viewport={{ once: true }}
+      >
+        <div className="max-w-xl mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold mb-4">Stay in the Loop</h2>
+          <p className="text-gray-400 mb-8">One curated startup deep-dive every week. No fluff, just insights.</p>
+          <Subscribe />
+        </div>
+    </motion.div>
+
       {/* Features Section */}
       <div className="py-20 bg-white">
         <div className="max-w-6xl mx-auto px-4">
@@ -80,21 +95,6 @@ export default function Blog() {
           </motion.div>
         </div>
       </div>
-
-      {/* Newsletter Section */}
-      <motion.div 
-        className="py-20 bg-black text-white"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        viewport={{ once: true }}
-      >
-        <div className="max-w-xl mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-4">Stay in the Loop</h2>
-          <p className="text-gray-400 mb-8">One curated startup deep-dive every week. No fluff, just insights.</p>
-          <Subscribe />
-        </div>
-    </motion.div>
 
     </div>
   );
