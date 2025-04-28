@@ -17,7 +17,7 @@ class Post:
             "title": self.title,
             "content": self.content,
             "timestamp": str(self.timestamp),
-            "likes": int(self.likes),
+            "likes": self.likes,  # Don't convert to int, it's a list
             "post_id": self.post_id,
             "comments": self.comments
         }

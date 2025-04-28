@@ -14,7 +14,10 @@ app = FastAPI()
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "http://10.250.89.39:3000",  # Local network access
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -162,19 +165,33 @@ def search_user(email: str = Query(...)):
 
 @app.post("/api/comment")
 def comment(req: CommentRequest):
-    stub = find_leader_stub()
-    if not stub:
-        return {"success": False, "error": "Leader not available"}
+    try:
+        print("Finding leader stub...")
+        stub = find_leader_stub()
+        if not stub:
+            print("No leader available")
+            return {"success": False, "error": "Leader not available"}
 
-    post_id = req.post_id
-    email = req.email
-    text = req.text
+        post_id = req.post_id
+        email = req.email
+        text = req.text
+        print(f"Making gRPC request with post_id={post_id}, email={email}, text={text}")
 
-    grpc_req = blog_pb2.Request(info=[post_id, email, text])
-    grpc_resp = stub.RPCCommentPost(grpc_req)
-    if grpc_resp.operation == blog_pb2.SUCCESS:
-        return {"success": True}
-    return {"success": False, "error": "Failed to comment"}
+        grpc_req = blog_pb2.Request(info=[post_id, email, text])
+        print("Created gRPC request, calling RPCCommentPost...")
+        grpc_resp = stub.RPCCommentPost(grpc_req)
+        print(f"Got gRPC response: {grpc_resp}")
+
+        if grpc_resp.operation == blog_pb2.SUCCESS:
+            return {"success": True}
+        return {"success": False, "error": grpc_resp.info[0] if grpc_resp.info else "Failed to comment"}
+    except Exception as e:
+        import traceback
+        print("Exception in comment endpoint:")
+        print(str(e))
+        print("Traceback:")
+        print(traceback.format_exc())
+        return {"success": False, "error": f"Server error: {str(e)}"}
 
 @app.get("/api/comments")
 def get_comments(post_id: str = Query(...)) -> dict:
@@ -196,4 +213,3 @@ def get_comments(post_id: str = Query(...)) -> dict:
         ]
         return {"comments": comments}
     raise HTTPException(status_code=404, detail="Post not found")
-

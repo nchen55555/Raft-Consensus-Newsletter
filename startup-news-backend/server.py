@@ -51,7 +51,9 @@ class Server(blog_pb2_grpc.BlogServicer):
     HEARTBEAT_INTERVAL = 1.5
 
     def __init__(self, replica_config):
+        print("Creating new Server instance")
         self.replica_id = replica_config["id"]
+        print(f"Server instance created for replica {self.replica_id}")
         self.host = replica_config["host"]
         self.port = replica_config["port"]
         self.raft_store = replica_config["raft_store"]
@@ -468,7 +470,7 @@ class Server(blog_pb2_grpc.BlogServicer):
                         post_obj.title,
                         post_obj.content,
                         post_obj.timestamp.isoformat(),
-                        post_obj.likes
+                        json.dumps(post_obj.likes)  # Serialize likes list to JSON string
                     ])
                 f.flush()
                 os.fsync(f.fileno())
@@ -780,19 +782,15 @@ class Server(blog_pb2_grpc.BlogServicer):
             content=content,
             timestamp=datetime.now()
         )
-        
+    
         # Replicate the command
         command = "CREATE_POST"
         params = [post_id, title, content, author, post.timestamp.isoformat()]
         success = self.replicate_command(command, params)
-        
+    
         if success == SUCCESS:
-            # Add post to database
-            self.posts_database[post_id] = post
-            # Save to disk
-            self.save_data()
             return blog_pb2.Response(operation=blog_pb2.SUCCESS)
-            
+        
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Failed to replicate post"])
 
     def RPCLogin(self, request, context):
@@ -843,7 +841,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         res = self.replicate_command(op, params)
         
         if res == SUCCESS:
-            self.save_data()
+            # self.save_data()
             return blog_pb2.Response(operation=blog_pb2.SUCCESS)
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not create account"])
 
@@ -879,25 +877,48 @@ class Server(blog_pb2_grpc.BlogServicer):
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not replicate"])
 
     def RPCCommentPost(self, request, context):
-        if self.raft_node.role != "leader":
-            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
-        if len(request.info) <3: 
-            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing post_id/email/text"])
-        post_id, email, text = request.info
-        if post_id not in self.posts_database:
-            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Post does not exist"])
-        if email not in self.user_database:
-            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["User does not exist"])
-        
-        op = "COMMENT_POST"
-        params = [post_id, email, text]
-        res = self.replicate_command(op, params)
-        
-        if res == SUCCESS:
-            self.posts_database[post_id].comments.append(Comment(post_id, email, text, datetime.now()))
-            self.save_data()
-            return blog_pb2.Response(operation=blog_pb2.SUCCESS)
-        return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not replicate"])
+        try:
+            print("1. Starting RPCCommentPost")
+            print("2. Checking leader role")
+            if self.raft_node.role != "leader":
+                print("Not leader, returning")
+                return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
+
+            print("3. Checking request info length")
+            if len(request.info) < 3: 
+                print("Missing info")
+                return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing post_id/email/text"])
+
+            print("4. Unpacking request info")
+            post_id, email, text = request.info
+            print(f"5. Got post_id={post_id}, email={email}, text={text}")
+
+            print("6. Checking post existence")
+            if post_id not in self.posts_database:
+                print(f"Post {post_id} not found")
+                return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Post does not exist"])
+
+            print("7. Checking user existence")
+            if email not in self.user_database:
+                print(f"User {email} not found")
+                return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["User does not exist"])
+            
+            print("8. Setting up replication")
+            op = "COMMENT_POST"
+            params = [post_id, email, text]
+            print("9. Calling replicate_command")
+            res = self.replicate_command(op, params)
+            print("10. Got replication result:", res)
+            
+            if res == SUCCESS:
+                print("11. Success!")
+                return blog_pb2.Response(operation=blog_pb2.SUCCESS)
+            print("12. Failed to replicate")
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not replicate"])
+        except Exception as e:
+            print(f"ERROR in RPCCommentPost: {str(e)}")
+            logging.error(f"ERROR in RPCCommentPost: {str(e)}", exc_info=True)
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=[f"Server error: {str(e)}"])
 
     def RPCGetComments(self, request, context):
         if self.raft_node.role != "leader":
