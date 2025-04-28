@@ -2,12 +2,12 @@ from datetime import datetime
 from protos import blog_pb2
 
 class Post:
-    def __init__(self, author, title, content, post_id=None, timestamp=None):
+    def __init__(self, author, title, content, likes=None, post_id=None, timestamp=None):
         self.author = author
         self.title = title
         self.content = content
         self.timestamp = timestamp or datetime.now()
-        self.likes = []
+        self.likes = likes if likes is not None else []
         self.post_id = post_id
         self.comments = []
         
@@ -17,7 +17,7 @@ class Post:
             "title": self.title,
             "content": self.content,
             "timestamp": str(self.timestamp),
-            "likes": self.likes,
+            "likes": int(self.likes),
             "post_id": self.post_id,
             "comments": self.comments
         }
@@ -43,7 +43,8 @@ class Post:
             title=self.title,
             content=self.content,
             timestamp=self.timestamp.isoformat(),
-            likes=self.likes
+            likes=self.likes,
+            comments=[c.to_proto() for c in self.comments]  # <-- add this line
         )
     
     @classmethod
@@ -54,7 +55,9 @@ class Post:
             author=proto_post.author,
             title=proto_post.title,
             content=proto_post.content,
-            timestamp=datetime.fromisoformat(proto_post.timestamp)
+            timestamp=datetime.fromisoformat(proto_post.timestamp),
+            likes=proto_post.likes,
+            comments=[Comment.from_proto(c) for c in proto_post.comments]  # <-- add this line
         )
 
     def like(self, username):

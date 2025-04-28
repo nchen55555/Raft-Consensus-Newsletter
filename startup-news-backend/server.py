@@ -14,6 +14,7 @@ from email_validator import validate_email, EmailNotValidError
 from protos import blog_pb2, blog_pb2_grpc
 from user import User
 from post import Post
+from comment import Comment
 from util import hash_password
 from consensus import (
     RaftNode,
@@ -57,6 +58,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         self.posts_store = replica_config["posts_store"]
         self.users_store = replica_config["users_store"]
         self.writers_store = replica_config["writers_store"]
+        self.comments_store = replica_config["comments_store"]
         # self.subscriptions_store = replica_config["subscriptions_store"]
 
         # Blog data
@@ -392,16 +394,38 @@ class Server(blog_pb2_grpc.BlogServicer):
                     next(rd)  # Skip header
                     for row in rd:
                         post_id, author, title, content, timestamp, likes = row
+                        if isinstance(likes, str):
+                            try:
+                                likes = json.loads(likes)
+                            except Exception:
+                                likes = []
                         self.posts_database[post_id] = Post(
                             post_id=post_id,
                             author=author,
                             title=title,
                             content=content,
                             timestamp=datetime.fromisoformat(timestamp),
-                            likes=int(likes)
+                            likes=likes,
                         )
             except Exception as e:
                 logging.error(f"Error loading posts: {e}")
+
+        # Load comments
+        if os.path.exists(self.comments_store):
+            try:
+                with open(self.comments_store, "r") as f:
+                    rd = csv.reader(f)
+                    next(rd)  # Skip header
+                    for row in rd:
+                        post_id, email, text, timestamp = row
+                        self.posts_database[post_id].comments.append(Comment(
+                            post_id=post_id,
+                            email=email,
+                            text=text,
+                            timestamp=datetime.fromisoformat(timestamp)
+                        ))
+            except Exception as e:
+                logging.error(f"Error loading comments: {e}")
 
     def save_data(self):
         # Save users
@@ -451,6 +475,24 @@ class Server(blog_pb2_grpc.BlogServicer):
         except Exception as e:
             logging.error(f"Error saving posts data: {e}")
 
+        # Save comments
+        try:
+            with open(self.comments_store, "w", newline="") as f:
+                wr = csv.writer(f)
+                wr.writerow(["post_id", "email", "text", "timestamp"])
+                for post_id, post_obj in self.posts_database.items():
+                    for comment in post_obj.comments:
+                        wr.writerow([
+                            post_id,
+                            comment.email,
+                            comment.text,
+                            comment.timestamp.isoformat()
+                        ])
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception as e:
+            logging.error(f"Error saving comments data: {e}")
+
     # --------------------------------------------------------------------------
     # Blog operations application
     # --------------------------------------------------------------------------
@@ -465,7 +507,7 @@ class Server(blog_pb2_grpc.BlogServicer):
             if email not in self.user_database:
                 self.user_database[email] = User(email)
 
-        if op == "CREATE_ACCOUNT":
+        elif op == "CREATE_ACCOUNT":
             if len(params) != 3:
                 return
             name, email, password = params
@@ -475,7 +517,19 @@ class Server(blog_pb2_grpc.BlogServicer):
                     name=name,
                     password=password
                 )
-        
+
+        elif op == "COMMENT_POST":
+            if len(params) != 3: 
+                return 
+            post_id, email, text = params
+            comment = Comment(
+                post_id=post_id,
+                email=email,
+                text=text,
+                timestamp=datetime.now()
+            )
+            self.posts_database[post_id].comments.append(comment)
+            
         elif op == "CREATE_POST":
             if len(params) < 5:
                 return
@@ -512,18 +566,6 @@ class Server(blog_pb2_grpc.BlogServicer):
                 self.posts_database[post_id].unlike(username)
                 
 
-        elif op == "ADD_COMMENT":
-            if len(params) < 4:
-                return
-            post_id, author, comment, timestamp = params
-            if post_id in self.posts_database and author in self.user_database:
-                comment_obj = {
-                    "author": author,
-                    "content": comment,
-                    "timestamp": timestamp
-                }
-                self.posts_database[post_id].comments.append(comment_obj)
-                
         elif op == "DELETE_POST":
             if len(params) < 2:
                 return
@@ -801,6 +843,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         res = self.replicate_command(op, params)
         
         if res == SUCCESS:
+            self.save_data()
             return blog_pb2.Response(operation=blog_pb2.SUCCESS)
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not create account"])
 
@@ -831,19 +874,51 @@ class Server(blog_pb2_grpc.BlogServicer):
         res = self.replicate_command(op, params)
         
         if res == SUCCESS:
+            self.save_data()
             return blog_pb2.Response(operation=blog_pb2.SUCCESS)
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not replicate"])
 
-    # def RPCSearchUsers(self, request, context):
-    #     if len(request.info) < 1:
-    #         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing prefix"])
-    #     prefix = request.info[0]
+    def RPCCommentPost(self, request, context):
+        if self.raft_node.role != "leader":
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
+        if len(request.info) <3: 
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing post_id/email/text"])
+        post_id, email, text = request.info
+        if post_id not in self.posts_database:
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Post does not exist"])
+        if email not in self.user_database:
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["User does not exist"])
         
-    #     matching_users = []
-    #     for username in self.user_database:
-    #         if username.startswith(prefix):
-    #             matching_users.append(username)
-    #     return blog_pb2.Response(operation=blog_pb2.SUCCESS, info=matching_users)
+        op = "COMMENT_POST"
+        params = [post_id, email, text]
+        res = self.replicate_command(op, params)
+        
+        if res == SUCCESS:
+            self.posts_database[post_id].comments.append(Comment(post_id, email, text, datetime.now()))
+            self.save_data()
+            return blog_pb2.Response(operation=blog_pb2.SUCCESS)
+        return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not replicate"])
+
+    def RPCGetComments(self, request, context):
+        if self.raft_node.role != "leader":
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
+        if len(request.info) < 1:
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing post_id"])
+        post_id = request.info[0]
+        if post_id not in self.posts_database:
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Post does not exist"])
+        
+        return blog_pb2.Response(operation=blog_pb2.SUCCESS, info=[post_id, self.posts_database[post_id].comments])
+
+    def RPCSearchUsers(self, request, context):
+        if len(request.info) < 1:
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing email"])
+        email = request.info[0]
+        
+        for username in self.user_database:
+            if email == username:
+                return blog_pb2.Response(operation=blog_pb2.SUCCESS, info=[username])
+        return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["User not found"])
 
     def RPCLikePost(self, request, context):
         if self.raft_node.role != "leader":
@@ -931,6 +1006,16 @@ class Server(blog_pb2_grpc.BlogServicer):
             return blog_pb2.Response(operation=blog_pb2.SUCCESS)
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not replicate"])
 
+    def RPCGetAllPosts(self, request, context): 
+        if self.raft_node.role != "leader":
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
+        
+        posts = list(self.posts_database.values())
+        return blog_pb2.Response(
+            operation=blog_pb2.SUCCESS,
+            posts=[post_obj.to_proto() for post_obj in posts]
+            )
+
     def RPCGetPost(self, request, context):
         if len(request.info) < 1:
             return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing post ID"])
@@ -945,21 +1030,21 @@ class Server(blog_pb2_grpc.BlogServicer):
             posts=[post.to_proto()]
         )
 
-    def RPCGetUserPosts(self, request, context):
-        if len(request.info) < 1:
-            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing username"])
+    # def RPCGetUserPosts(self, request, context):
+    #     if len(request.info) < 1:
+    #         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing username"])
         
-        username = request.info[0]
-        if username not in self.user_database:
-            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["User not found"])
+    #     username = request.info[0]
+    #     if username not in self.user_database:
+    #         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["User not found"])
         
-        user_posts = []
-        for post_id in self.user_database[username].posts:
-            if post_id in self.posts_database:
-                post = self.posts_database[post_id]
-                user_posts.append(post.to_proto())
+    #     user_posts = []
+    #     for post_id in self.user_database[username].posts:
+    #         if post_id in self.posts_database:
+    #             post = self.posts_database[post_id]
+    #             user_posts.append(post.to_proto())
         
-        return blog_pb2.Response(operation=blog_pb2.SUCCESS, posts=user_posts)
+    #     return blog_pb2.Response(operation=blog_pb2.SUCCESS, posts=user_posts)
 
     def RPCGetNotifications(self, request, context):
         if len(request.info) < 1:

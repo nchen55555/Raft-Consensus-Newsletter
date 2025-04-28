@@ -70,6 +70,11 @@ class BlogStub(object):
                 request_serializer=protos_dot_blog__pb2.Request.SerializeToString,
                 response_deserializer=protos_dot_blog__pb2.Response.FromString,
                 _registered_method=True)
+        self.RPCGetAllPosts = channel.unary_unary(
+                '/blog.Blog/RPCGetAllPosts',
+                request_serializer=protos_dot_blog__pb2.Request.SerializeToString,
+                response_deserializer=protos_dot_blog__pb2.Response.FromString,
+                _registered_method=True)
         self.RPCGetUserPosts = channel.unary_unary(
                 '/blog.Blog/RPCGetUserPosts',
                 request_serializer=protos_dot_blog__pb2.Request.SerializeToString,
@@ -92,6 +97,16 @@ class BlogStub(object):
                 _registered_method=True)
         self.RPCDeletePost = channel.unary_unary(
                 '/blog.Blog/RPCDeletePost',
+                request_serializer=protos_dot_blog__pb2.Request.SerializeToString,
+                response_deserializer=protos_dot_blog__pb2.Response.FromString,
+                _registered_method=True)
+        self.RPCCommentPost = channel.unary_unary(
+                '/blog.Blog/RPCCommentPost',
+                request_serializer=protos_dot_blog__pb2.Request.SerializeToString,
+                response_deserializer=protos_dot_blog__pb2.Response.FromString,
+                _registered_method=True)
+        self.RPCGetComments = channel.unary_unary(
+                '/blog.Blog/RPCGetComments',
                 request_serializer=protos_dot_blog__pb2.Request.SerializeToString,
                 response_deserializer=protos_dot_blog__pb2.Response.FromString,
                 _registered_method=True)
@@ -190,6 +205,12 @@ class BlogServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RPCGetAllPosts(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def RPCGetUserPosts(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -215,6 +236,18 @@ class BlogServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def RPCDeletePost(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RPCCommentPost(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RPCGetComments(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -317,6 +350,11 @@ def add_BlogServicer_to_server(servicer, server):
                     request_deserializer=protos_dot_blog__pb2.Request.FromString,
                     response_serializer=protos_dot_blog__pb2.Response.SerializeToString,
             ),
+            'RPCGetAllPosts': grpc.unary_unary_rpc_method_handler(
+                    servicer.RPCGetAllPosts,
+                    request_deserializer=protos_dot_blog__pb2.Request.FromString,
+                    response_serializer=protos_dot_blog__pb2.Response.SerializeToString,
+            ),
             'RPCGetUserPosts': grpc.unary_unary_rpc_method_handler(
                     servicer.RPCGetUserPosts,
                     request_deserializer=protos_dot_blog__pb2.Request.FromString,
@@ -339,6 +377,16 @@ def add_BlogServicer_to_server(servicer, server):
             ),
             'RPCDeletePost': grpc.unary_unary_rpc_method_handler(
                     servicer.RPCDeletePost,
+                    request_deserializer=protos_dot_blog__pb2.Request.FromString,
+                    response_serializer=protos_dot_blog__pb2.Response.SerializeToString,
+            ),
+            'RPCCommentPost': grpc.unary_unary_rpc_method_handler(
+                    servicer.RPCCommentPost,
+                    request_deserializer=protos_dot_blog__pb2.Request.FromString,
+                    response_serializer=protos_dot_blog__pb2.Response.SerializeToString,
+            ),
+            'RPCGetComments': grpc.unary_unary_rpc_method_handler(
+                    servicer.RPCGetComments,
                     request_deserializer=protos_dot_blog__pb2.Request.FromString,
                     response_serializer=protos_dot_blog__pb2.Response.SerializeToString,
             ),
@@ -589,6 +637,33 @@ class Blog(object):
             _registered_method=True)
 
     @staticmethod
+    def RPCGetAllPosts(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/blog.Blog/RPCGetAllPosts',
+            protos_dot_blog__pb2.Request.SerializeToString,
+            protos_dot_blog__pb2.Response.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def RPCGetUserPosts(request,
             target,
             options=(),
@@ -711,6 +786,60 @@ class Blog(object):
             request,
             target,
             '/blog.Blog/RPCDeletePost',
+            protos_dot_blog__pb2.Request.SerializeToString,
+            protos_dot_blog__pb2.Response.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RPCCommentPost(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/blog.Blog/RPCCommentPost',
+            protos_dot_blog__pb2.Request.SerializeToString,
+            protos_dot_blog__pb2.Response.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RPCGetComments(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/blog.Blog/RPCGetComments',
             protos_dot_blog__pb2.Request.SerializeToString,
             protos_dot_blog__pb2.Response.FromString,
             options,

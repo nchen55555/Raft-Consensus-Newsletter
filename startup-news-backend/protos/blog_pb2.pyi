@@ -66,6 +66,30 @@ class Post(google.protobuf.message.Message):
 global___Post = Post
 
 @typing.final
+class Comment(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    POST_ID_FIELD_NUMBER: builtins.int
+    EMAIL_FIELD_NUMBER: builtins.int
+    TEXT_FIELD_NUMBER: builtins.int
+    TIMESTAMP_FIELD_NUMBER: builtins.int
+    post_id: builtins.str
+    email: builtins.str
+    text: builtins.str
+    timestamp: builtins.str
+    def __init__(
+        self,
+        *,
+        post_id: builtins.str = ...,
+        email: builtins.str = ...,
+        text: builtins.str = ...,
+        timestamp: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["email", b"email", "post_id", b"post_id", "text", b"text", "timestamp", b"timestamp"]) -> None: ...
+
+global___Comment = Comment
+
+@typing.final
 class Notification(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
