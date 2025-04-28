@@ -7,3 +7,4 @@ protobuf
 mypy-protobuf
 filelock
 bcrypt
+fastapi[all]

@@ -23,6 +23,12 @@ cd startup-news-backend
 pip3 install -r requirements.txt
 ```
 
+Also install other packages
+
+```
+brew install uvicorn
+```
+
 Now, we can finally use the app. Depending on the server and how you choose to run your system, you will need to double check your network setting to find the IP address of the server. Create our edit your `.env` file to include the IP address of the server. We've specified port 65432 as the default port, but feel free to change it to whatever you want.The server handles all client/user interactions, so we need to set the server up first. Run
 
 ```
