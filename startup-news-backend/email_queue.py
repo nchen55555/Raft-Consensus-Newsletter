@@ -59,7 +59,7 @@ class EmailWorker:
         msg.attach(MIMEText(content, "plain"))
 
         try:
-            with smtplib.SMTP(self.smtp_server, self.port, timeout=10) as server:
+            with smtplib.SMTP("localhost", 1025, timeout=10) as server:
                 server.ehlo()
                 # Use STARTTLS if available
                 if server.has_extn('starttls'):
@@ -68,6 +68,7 @@ class EmailWorker:
                 # Perform login only if server supports AUTH
                 if self.username and self.password and server.has_extn('auth'):
                     server.login(self.username, self.password)
+                
                 server.send_message(msg)
                 self.logger.info(f"Email sent to {recipient}")
         except Exception as e:

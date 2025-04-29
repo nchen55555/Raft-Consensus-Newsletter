@@ -10,6 +10,7 @@ from concurrent import futures
 from datetime import datetime
 import uuid
 from email_validator import validate_email, EmailNotValidError
+from email_queue import email_worker
 
 from protos import blog_pb2, blog_pb2_grpc
 from user import User
@@ -63,6 +64,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         self.comments_store = replica_config["comments_store"]
         # self.subscriptions_store = replica_config["subscriptions_store"]
 
+        email_worker.start()
         # Blog data
         self.user_database = {}
         self.posts_database = {}  # post_id -> Post
@@ -160,6 +162,8 @@ class Server(blog_pb2_grpc.BlogServicer):
             self.election_timer.cancel()
         if self.heartbeat_timer:
             self.heartbeat_timer.cancel()
+        
+        email_worker.stop()
 
     # --------------------------------------------------------------------------
     # Raft roles - unchanged from original implementation
@@ -605,7 +609,22 @@ class Server(blog_pb2_grpc.BlogServicer):
             self.remove_replica_local(rid)
 
     def notify_followers_of_new_post(self, author, post):
-        pass
+        for user in self.user_database.keys():
+            if user != author:
+                subject = f"New Post from {author}: {post.title}"
+                content = f"""
+                {author} has published a new post:
+                
+                {post.title}
+                View the full post on our platform.
+                """
+                # Queue the email
+                email_worker.queue_email(
+                    author,
+                    user,
+                    subject,
+                    content
+                )
 
     def add_replica_local(self, new_cfg):
         arr = get_replicas_config()
@@ -789,6 +808,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         success = self.replicate_command(command, params)
     
         if success == SUCCESS:
+            self.notify_followers_of_new_post(author, post)
             return blog_pb2.Response(operation=blog_pb2.SUCCESS)
         
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Failed to replicate post"])
