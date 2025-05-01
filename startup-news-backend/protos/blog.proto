@@ -57,11 +57,12 @@ message Response {
   repeated string info = 2; // any extra string data
   repeated Post posts = 3;  // For post listing operations
   repeated Notification notifications = 4; // For notification retrieval
+  repeated Comment comments = 5; // For comment retrieval
 
   // For Raft RPCs
-  bool voteGranted = 5;     // True if candidate received vote
-  int64 term = 6;           // CurrentTerm, for leader/candidate to update itself
-  bool success = 7;         // For AppendEntries success/failure
+  bool voteGranted = 6;     // True if candidate received vote
+  int64 term = 7;           // CurrentTerm, for leader/candidate to update itself
+  bool success = 8;         // For AppendEntries success/failure
 }
 
 // A Raft log entry

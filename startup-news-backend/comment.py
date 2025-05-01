@@ -1,3 +1,6 @@
+from datetime import datetime
+from protos import blog_pb2
+
 class Comment: 
     def __init__(self, post_id, email, text, timestamp):
         self.post_id = post_id

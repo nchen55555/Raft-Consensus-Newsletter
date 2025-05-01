@@ -14,25 +14,6 @@ def is_port_in_use(port):
         except socket.error:
             return True
 
-def read_process_output(process, timeout=5):
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        line = process.stdout.readline()
-        if line:
-            print(line.strip(), flush=True)  # Print server output immediately
-        
-        # Check if process is still running
-        if process.poll() is not None:
-            print(f"Server exited with code {process.poll()}", flush=True)
-            # Get any remaining output
-            remaining = process.stdout.read()
-            if remaining:
-                print(remaining.strip(), flush=True)
-            return False
-        
-        time.sleep(0.1)
-    return True
-
 def main():
     parser = argparse.ArgumentParser(description='Start Startup News server replicas')
     parser.add_argument('--replicas', type=str, nargs='+', help='List of replica IDs to start (e.g., replica1 replica2)')
@@ -66,9 +47,8 @@ def main():
             env['PYTHONUNBUFFERED'] = '1'
             
             p = subprocess.Popen(
-                ["python", "-u", "server.py", "--id", r["id"]],  # Added -u flag
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                ["python", "-u", "server.py", "--id", r["id"]],
+                stderr=subprocess.DEVNULL,
                 text=True,
                 bufsize=1,  # Line buffered
                 env=env  # Pass modified environment
@@ -78,35 +58,27 @@ def main():
         else:
             print(f"Port {r['port']} is in use, skipping {r['id']}")
 
-    # Monitor all servers for 5 seconds to ensure they start properly
+    # Monitor all servers simultaneously for 5 seconds to ensure they start properly
     if processes:
-        print("\nMonitoring server startup:", flush=True)
-        for rid, p in processes:
-            if read_process_output(p):
-                print(f"Server {rid} appears to be running", flush=True)
-            else:
-                print(f"Server {rid} may have failed to start", flush=True)
-        print(f"\nStarted {len(processes)} new servers", flush=True)
+        print("\nServers are starting. You should see their output below:", flush=True)
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nShutting down servers...", flush=True)
+            for rid, p in processes:
+                try:
+                    p.terminate()
+                    p.wait(timeout=5)
+                    print(f"Stopped {rid}", flush=True)
+                except:
+                    print(f"Failed to stop {rid} gracefully", flush=True)
+                    try:
+                        p.kill()
+                    except:
+                        pass
     else:
         print("No new servers started.", flush=True)
-
-    # Keep the script running to maintain the server processes
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\nShutting down servers...", flush=True)
-        for rid, p in processes:
-            try:
-                p.terminate()
-                p.wait(timeout=5)
-                print(f"Stopped {rid}", flush=True)
-            except:
-                print(f"Failed to stop {rid} gracefully", flush=True)
-                try:
-                    p.kill()
-                except:
-                    pass
 
 if __name__ == "__main__":
     main()

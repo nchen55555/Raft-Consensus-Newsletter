@@ -21,7 +21,7 @@ export default function Login() {
   const handleLogin = async (values: { email: string; password: string }) => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/login', {
+      const response = await fetch('http://10.250.89.39:8000/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
@@ -54,7 +54,7 @@ export default function Login() {
   const handleCreateAccount = async (values: { email: string; password: string; name: string }) => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/create-account', {
+      const response = await fetch('http://10.250.89.39:8000/api/create-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),

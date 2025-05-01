@@ -9,7 +9,7 @@ export default function Subscribe({ onSubscribed }: { onSubscribed?: (email: str
 
   const handleSubscribe = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/subscribe", {
+      const res = await fetch("http://10.250.89.39:8000/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

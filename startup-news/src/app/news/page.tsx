@@ -9,6 +9,13 @@ import ReactMarkdown from 'react-markdown';
 import Link from 'next/link';
 import Subscribe from '@/components/Subscribe';
 
+interface Comment {
+  text: string;
+  email: string;
+  timestamp: string;
+  post_id: string;
+}
+
 interface Post {
   post_id: string;
   author: string;
@@ -16,6 +23,7 @@ interface Post {
   content: string;
   timestamp: string;
   likes: string[];
+  comments: Comment[];
 }
 
 // Helper to show only first 2 lines of markdown (approximate)
@@ -36,31 +44,36 @@ export default function News() {
   const [verifying, setVerifying] = React.useState(false);
   const [verifyError, setVerifyError] = React.useState('');
 
-
+  // Initialize session email from storage
   useEffect(() => {
     const storedEmail = sessionStorage.getItem('startupnews_email');
     setSessionEmail(storedEmail);
-  }, []);
+  }, []); // Only run once on mount
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('http://10.250.89.39:8000/api/posts');
+        if (!response.ok) throw new Error('Failed to fetch posts');
+        const data = await response.json();
+        setPosts(data || []); 
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Only fetch if we have a session email
+    if (sessionEmail) {
+      fetchData();
+    }
+  }, [sessionEmail]); // Re-run when sessionEmail changes
 
   useEffect(() => {
     console.log(`posts present ${posts.length}`);
   }, [posts]);
-
-  useEffect(() => {
-    if (!sessionEmail) return;
-    const fetchPosts = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/api/posts');
-        const data = await response.json();
-        setPosts(data);
-        setLoading(false);
-        console.log("Fetched posts data:", data);
-      } catch (error) {
-        setLoading(false);
-      }
-    };
-    fetchPosts();
-  }, [sessionEmail]);
 
   useEffect(() => {
     const onStorage = () => {
@@ -76,7 +89,7 @@ export default function News() {
       setVerifying(true);
       setVerifyError('');
       try {
-        const resp = await fetch(`http://localhost:8000/api/search_user?email=${encodeURIComponent(verifyEmail)}`);
+        const resp = await fetch(`http://10.250.89.39:8000/api/search_user?email=${encodeURIComponent(verifyEmail)}`);
         const result = await resp.json();
         if (result.success) {
           sessionStorage.setItem('startupnews_email', verifyEmail);

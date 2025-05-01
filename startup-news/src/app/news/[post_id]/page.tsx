@@ -5,9 +5,10 @@ import ReactMarkdown from 'react-markdown';
 import Navigation from '@/components/Navigation';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
 import { useEffect, useState, useRef } from 'react';
-import { Input, Button } from 'antd';
+import { Input, Button, Space } from 'antd';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
+import { HeartOutlined, HeartFilled } from '@ant-design/icons';
 
 export default function PostDetailPage() {
   const params = useParams();
@@ -16,7 +17,7 @@ export default function PostDetailPage() {
   const textAreaRef = useRef<TextAreaRef>(null);
   const [commentTexts, setCommentTexts] = useState<{ [postId: string]: string }>({});
   const [commentSubmitting, setCommentSubmitting] = useState<{ [postId: string]: boolean }>({});
-  const [comments, setComments] = useState<{ [postId: string]: { email: string; text: string }[] }>({});
+  const [comments, setComments] = useState<{ [postId: string]: { email: string; text: string; timestamp: string }[] }>({});
   const commentInputRefs = useRef<{ [postId: string]: HTMLTextAreaElement | null }>({});
 
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
@@ -26,15 +27,17 @@ export default function PostDetailPage() {
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const [likeSubmitting, setLikeSubmitting] = useState(false);
+
   const fetchComments = async (postId: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/comments?post_id=${encodeURIComponent(postId)}`);
+      console.log(`Fetched Comments!`);
+      const response = await fetch(`http://10.250.89.39:8000/api/comments?post_id=${encodeURIComponent(postId)}`);
       if (!response.ok) throw new Error('Failed to fetch comments');
       const data = await response.json();
-      setComments(prev => ({
-        ...prev,
-        [postId]: data.comments || [] // Adjust if your backend returns a different shape
-      }));
+      setComments({
+        [postId]: data.comments || []
+      });
     } catch (error) {
       // Optionally handle error
     }
@@ -48,25 +51,42 @@ export default function PostDetailPage() {
     }
   }, [router]);
 
+  // useEffect(() => {
+  //   if (post_id) {
+  //     fetchComments(post_id as string);
+  //   }
+  // }, [post_id]);
+
   const handleAddComment = async (postId: string) => {
     if (!sessionEmail || !commentTexts[postId]?.trim()) return;
     setCommentSubmitting(prev => ({ ...prev, [postId]: true }));
     console.log(`Adding comment...${postId}, ${sessionEmail}, ${commentTexts[postId]}`);
     try {
-      const response = await fetch('http://localhost:8000/api/comment', {
+      const response = await fetch('http://10.250.89.39:8000/api/comment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           post_id: postId,
           email: sessionEmail,
-          text: commentTexts[postId]
+          text: commentTexts[postId],
+          timestamp: new Date().toISOString()
         }),
       });
 
       if (!response.ok) throw new Error('Failed to add comment');
 
-      // Fetch the latest comments from backend here
-      await fetchComments(postId);
+      // Refresh the entire post to get updated comments
+      const postRes = await fetch(`http://10.250.89.39:8000/api/posts/${postId}`);
+      if (!postRes.ok) throw new Error('Failed to fetch updated post');
+      const updatedPost = await postRes.json();
+      setPost(updatedPost);
+      if (updatedPost.comments) {
+        setComments(prev => ({
+          ...prev,
+          [updatedPost.post_id]: updatedPost.comments
+        }));
+      }
+      
       setCommentTexts(prev => ({ ...prev, [postId]: '' }));
       // Optionally focus textarea again
       commentInputRefs.current[postId]?.focus();
@@ -77,14 +97,48 @@ export default function PostDetailPage() {
     }
   };
 
+  const handleLike = async () => {
+    if (!sessionEmail) return;
+    setLikeSubmitting(true);
+    try {
+      const response = await fetch('http://10.250.89.39:8000/api/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          post_id: post.post_id,
+          email: sessionEmail
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to like post');
+
+      // Refresh post data to get updated likes
+      const postRes = await fetch(`http://10.250.89.39:8000/api/posts/${post.post_id}`);
+      if (!postRes.ok) throw new Error('Failed to fetch updated post');
+      const updatedPost = await postRes.json();
+      setPost(updatedPost);
+    } catch (error) {
+      // Handle error
+    } finally {
+      setLikeSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     // Fetch post data on mount
     const fetchPost = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/posts/${post_id}`);
+        const res = await fetch(`http://10.250.89.39:8000/api/posts/${post_id}`);
         if (!res.ok) throw new Error('Failed to fetch post');
         const data = await res.json();
         setPost(data);
+        // Set comments from the post data
+        if (data.comments) {
+          setComments(prev => ({
+            ...prev,
+            [data.post_id]: data.comments
+          }));
+        }
       } catch (err) {
         // handle error
       } finally {
@@ -109,6 +163,18 @@ export default function PostDetailPage() {
             By {post.author} • {new Date(post.timestamp).toLocaleString()}
           </div>
           <div className="prose prose-lg text-black">
+            <div className="flex items-center gap-4 mb-4">
+              <Button 
+                type="text"
+                icon={post.likes?.includes(sessionEmail) ? <HeartFilled className="text-red-500" /> : <HeartOutlined />}
+                onClick={handleLike}
+                loading={likeSubmitting}
+                disabled={!sessionEmail || likeSubmitting}
+                className="flex items-center"
+              >
+                <span className="ml-1">{post.likes?.length || 0}</span>
+              </Button>
+            </div>
             <ReactMarkdown>{post.content}</ReactMarkdown>
             {/* Comments section */}
             <div className="mt-8 border-t pt-6">
@@ -120,7 +186,11 @@ export default function PostDetailPage() {
                   <ul className="space-y-2">
                     {post.comments.map((c: any, idx: number) => (
                       <li key={idx} className="bg-gray-50 rounded px-3 py-2 text-left">
-                        <span className="font-medium text-blue-700">{c.email}</span>: {c.text}
+                        <div>
+                          <span className="font-medium text-blue-700">{c.email}</span>
+                          <span className="text-gray-500 text-sm ml-2">• {new Date(c.timestamp).toLocaleString()}</span>
+                        </div>
+                        <div className="mt-1">{c.text}</div>
                       </li>
                     ))}
                   </ul>

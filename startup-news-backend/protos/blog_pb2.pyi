@@ -44,6 +44,7 @@ class Post(google.protobuf.message.Message):
     CONTENT_FIELD_NUMBER: builtins.int
     TIMESTAMP_FIELD_NUMBER: builtins.int
     LIKES_FIELD_NUMBER: builtins.int
+    COMMENTS_FIELD_NUMBER: builtins.int
     post_id: builtins.str
     author: builtins.str
     title: builtins.str
@@ -51,6 +52,8 @@ class Post(google.protobuf.message.Message):
     timestamp: builtins.str
     @property
     def likes(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def comments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Comment]: ...
     def __init__(
         self,
         *,
@@ -60,8 +63,9 @@ class Post(google.protobuf.message.Message):
         content: builtins.str = ...,
         timestamp: builtins.str = ...,
         likes: collections.abc.Iterable[builtins.str] | None = ...,
+        comments: collections.abc.Iterable[global___Comment] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["author", b"author", "content", b"content", "likes", b"likes", "post_id", b"post_id", "timestamp", b"timestamp", "title", b"title"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["author", b"author", "comments", b"comments", "content", b"content", "likes", b"likes", "post_id", b"post_id", "timestamp", b"timestamp", "title", b"title"]) -> None: ...
 
 global___Post = Post
 
@@ -180,6 +184,7 @@ class Response(google.protobuf.message.Message):
     INFO_FIELD_NUMBER: builtins.int
     POSTS_FIELD_NUMBER: builtins.int
     NOTIFICATIONS_FIELD_NUMBER: builtins.int
+    COMMENTS_FIELD_NUMBER: builtins.int
     VOTEGRANTED_FIELD_NUMBER: builtins.int
     TERM_FIELD_NUMBER: builtins.int
     SUCCESS_FIELD_NUMBER: builtins.int
@@ -207,6 +212,10 @@ class Response(google.protobuf.message.Message):
     def notifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Notification]:
         """For notification retrieval"""
 
+    @property
+    def comments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Comment]:
+        """For comment retrieval"""
+
     def __init__(
         self,
         *,
@@ -214,11 +223,12 @@ class Response(google.protobuf.message.Message):
         info: collections.abc.Iterable[builtins.str] | None = ...,
         posts: collections.abc.Iterable[global___Post] | None = ...,
         notifications: collections.abc.Iterable[global___Notification] | None = ...,
+        comments: collections.abc.Iterable[global___Comment] | None = ...,
         voteGranted: builtins.bool = ...,
         term: builtins.int = ...,
         success: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["info", b"info", "notifications", b"notifications", "operation", b"operation", "posts", b"posts", "success", b"success", "term", b"term", "voteGranted", b"voteGranted"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["comments", b"comments", "info", b"info", "notifications", b"notifications", "operation", b"operation", "posts", b"posts", "success", b"success", "term", b"term", "voteGranted", b"voteGranted"]) -> None: ...
 
 global___Response = Response
 

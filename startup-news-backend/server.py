@@ -10,7 +10,7 @@ from concurrent import futures
 from datetime import datetime
 import uuid
 from email_validator import validate_email, EmailNotValidError
-from email_queue import email_worker
+# from email_queue import email_worker
 
 from protos import blog_pb2, blog_pb2_grpc
 from user import User
@@ -64,7 +64,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         self.comments_store = replica_config["comments_store"]
         # self.subscriptions_store = replica_config["subscriptions_store"]
 
-        email_worker.start()
+        # email_worker.start()
         # Blog data
         self.user_database = {}
         self.posts_database = {}  # post_id -> Post
@@ -85,7 +85,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         self.load_data()
         self.raft_node.lastApplied = self.raft_node.commitIndex
         
-        # Reset votedFor to break deadlock
+       # Reset votedFor to break deadlock
         self.raft_node.votedFor = None
         self.raft_node.save_raft_state()
         
@@ -95,6 +95,9 @@ class Server(blog_pb2_grpc.BlogServicer):
         self.heartbeat_timer = None
         self.reset_election_timer()
 
+        # Start email worker
+        # email_worker.start()
+
     def get_cluster_stubs(self):
         # Refresh stubs for replicas that might have restarted
         for cfg in self.replicas_config:
@@ -102,7 +105,7 @@ class Server(blog_pb2_grpc.BlogServicer):
             if rid != self.replica_id:
                 # Check if we need to refresh this connection
                 need_refresh = False
-            
+
                 if rid not in self._stubs_cache:
                     need_refresh = True
                 else:
@@ -162,8 +165,8 @@ class Server(blog_pb2_grpc.BlogServicer):
             self.election_timer.cancel()
         if self.heartbeat_timer:
             self.heartbeat_timer.cancel()
-        
-        email_worker.stop()
+            
+        # email_worker.stop()
 
     # --------------------------------------------------------------------------
     # Raft roles - unchanged from original implementation
@@ -525,16 +528,17 @@ class Server(blog_pb2_grpc.BlogServicer):
                 )
 
         elif op == "COMMENT_POST":
-            if len(params) != 3: 
+            if len(params) != 4: 
                 return 
-            post_id, email, text = params
+            post_id, email, text, timestamp = params
             comment = Comment(
                 post_id=post_id,
                 email=email,
                 text=text,
-                timestamp=datetime.now()
+                timestamp=datetime.fromisoformat(timestamp)
             )
             self.posts_database[post_id].comments.append(comment)
+            print("COMMENTS IN POST: ", self.posts_database[post_id].comments)
             
         elif op == "CREATE_POST":
             if len(params) < 5:
@@ -546,7 +550,9 @@ class Server(blog_pb2_grpc.BlogServicer):
                 author=author,
                 title=title,
                 content=content,
-                timestamp=datetime.fromisoformat(timestamp)
+                timestamp=datetime.fromisoformat(timestamp),
+                likes=[],
+                comments=[]
             )
             
             self.posts_database[post_id] = post
@@ -560,9 +566,14 @@ class Server(blog_pb2_grpc.BlogServicer):
         elif op == "LIKE_POST":
             if len(params) < 2:
                 return
-            post_id, username = params
-            if post_id in self.posts_database and username in self.user_database:
-                self.posts_database[post_id].like(username)
+            post_id, email = params
+            post = self.posts_database[post_id]
+            
+            # Toggle like - if already liked, unlike it
+            if email in post.likes:
+                post.likes.remove(email)
+            else:
+                post.likes.append(email)
                 
         elif op == "UNLIKE_POST":
             if len(params) < 2:
@@ -608,23 +619,30 @@ class Server(blog_pb2_grpc.BlogServicer):
             rid = params[0]
             self.remove_replica_local(rid)
 
-    def notify_followers_of_new_post(self, author, post):
-        for user in self.user_database.keys():
-            if user != author:
-                subject = f"New Post from {author}: {post.title}"
-                content = f"""
-                {author} has published a new post:
+    # def notify_followers_of_new_post(self, author, post):
+    #     if self.raft_node.role != "leader":
+    #         return
+        
+    #     followers = self.user_database[author].followers
+    #     for follower in followers:
+    #         if follower in self.user_database:
+    #             subject = f"New Post from {author}: {post.title}"
+    #             content = f"""
+    #             {author} has published a new post:
                 
-                {post.title}
-                View the full post on our platform.
-                """
-                # Queue the email
-                email_worker.queue_email(
-                    author,
-                    user,
-                    subject,
-                    content
-                )
+    #             {post.title}
+                
+    #             {post.content[:200]}{'...' if len(post.content) > 200 else ''}
+                
+    #             View the full post on our platform.
+    #             """
+    #             # Queue the email
+    #             email_worker.queue_email(
+    #                 author,
+    #                 follower,
+    #                 subject,
+    #                 content
+    #             )
 
     def add_replica_local(self, new_cfg):
         arr = get_replicas_config()
@@ -782,16 +800,18 @@ class Server(blog_pb2_grpc.BlogServicer):
     # --------------------------------------------------------------------------
     def RPCCreatePost(self, request, context):
         """Create a new blog post"""
+        print("RPCCreatePost called 1")
         if self.raft_node.role != "leader":
             return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
-
+        print("RPCCreatePost called 2")
         if len(request.info) != 3:
             return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Invalid request format"])
-
+        print("RPCCreatePost called 3")
         title, content, author = request.info
+        print("RPCCreatePost called 4")
         if not title or not content or not author:
             return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing required fields"])
-
+        print("RPCCreatePost called 5")
         # Create the post
         post_id = str(uuid.uuid4())
         post = Post(
@@ -799,18 +819,21 @@ class Server(blog_pb2_grpc.BlogServicer):
             author=author,
             title=title,
             content=content,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
+            likes=[],
+            comments=[]
         )
-    
+        print("RPCCreatePost called 6")
         # Replicate the command
         command = "CREATE_POST"
         params = [post_id, title, content, author, post.timestamp.isoformat()]
         success = self.replicate_command(command, params)
-    
+        print("RPCCreatePost called 7: " + str(success))
         if success == SUCCESS:
-            self.notify_followers_of_new_post(author, post)
+            # Notify followers via email
+            # self.notify_followers_of_new_post(author, post)
+            print("RPCCreatePost called 8")
             return blog_pb2.Response(operation=blog_pb2.SUCCESS)
-        
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Failed to replicate post"])
 
     def RPCLogin(self, request, context):
@@ -905,13 +928,13 @@ class Server(blog_pb2_grpc.BlogServicer):
                 return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
 
             print("3. Checking request info length")
-            if len(request.info) < 3: 
+            if len(request.info) < 4: 
                 print("Missing info")
-                return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing post_id/email/text"])
+                return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing post_id/email/text/timestamp"])
 
             print("4. Unpacking request info")
-            post_id, email, text = request.info
-            print(f"5. Got post_id={post_id}, email={email}, text={text}")
+            post_id, email, text, timestamp = request.info
+            print(f"5. Got post_id={post_id}, email={email}, text={text}, timestamp={timestamp}")
 
             print("6. Checking post existence")
             if post_id not in self.posts_database:
@@ -919,13 +942,13 @@ class Server(blog_pb2_grpc.BlogServicer):
                 return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Post does not exist"])
 
             print("7. Checking user existence")
-            if email not in self.user_database:
+            if email not in self.user_database and email not in self.writers_database:
                 print(f"User {email} not found")
                 return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["User does not exist"])
             
             print("8. Setting up replication")
             op = "COMMENT_POST"
-            params = [post_id, email, text]
+            params = [post_id, email, text, timestamp]
             print("9. Calling replicate_command")
             res = self.replicate_command(op, params)
             print("10. Got replication result:", res)
@@ -941,15 +964,29 @@ class Server(blog_pb2_grpc.BlogServicer):
             return blog_pb2.Response(operation=blog_pb2.FAILURE, info=[f"Server error: {str(e)}"])
 
     def RPCGetComments(self, request, context):
+        print("Inside the RPCGetComments function...")
+        print(f"Current role: {self.raft_node.role}")
         if self.raft_node.role != "leader":
+            print(f"Not leader, returning failure. Role is {self.raft_node.role}")
             return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
+        print("Beyond Leader Election")
         if len(request.info) < 1:
             return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing post_id"])
+        print("Beyond Missing Post ID")
         post_id = request.info[0]
+        print(f"Post ID: {post_id}")
         if post_id not in self.posts_database:
             return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Post does not exist"])
+        print("Beyond Post Not Found")
         
-        return blog_pb2.Response(operation=blog_pb2.SUCCESS, info=[post_id, self.posts_database[post_id].comments])
+        # Convert comments to proto format
+        proto_comments = []
+        for comment in self.posts_database[post_id].comments:
+            print(f"Comment: {comment}")
+            proto_comments.append(comment.to_proto())
+            print(f"Proto Comment: {proto_comments[-1]}")
+        print("Beyond Comments Conversion")
+        return blog_pb2.Response(operation=blog_pb2.SUCCESS, comments=proto_comments)
 
     def RPCSearchUsers(self, request, context):
         if len(request.info) < 1:
@@ -962,29 +999,49 @@ class Server(blog_pb2_grpc.BlogServicer):
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["User not found"])
 
     def RPCLikePost(self, request, context):
-        if self.raft_node.role != "leader":
-            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
-        if len(request.info) < 2:
-            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing post_id/username"])
-        
-        post_id, username = request.info
-        if post_id not in self.posts_database:
-            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Post does not exist"])
-        if username not in self.user_database:
-            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["User does not exist"])
-        
-        if username in self.posts_database[post_id].likes:
-            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Post already liked"])
-        
-        op = "LIKE_POST"
-        params = [post_id, username]
-        res = self.replicate_command(op, params)
-        
-        if res == SUCCESS:
-            return blog_pb2.Response(operation=blog_pb2.SUCCESS)
-        return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not replicate"])
+        try:
+            print("1. Starting RPCLikePost")
+            print("2. Checking leader role")
+            if self.raft_node.role != "leader":
+                print("Not leader, returning")
+                return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
 
-    
+            print("3. Checking request info length")
+            if len(request.info) < 2:
+                print("Missing info")
+                return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Missing post_id/email"])
+
+            print("4. Unpacking request info")
+            post_id, email = request.info
+            print(f"5. Got post_id={post_id}, email={email}")
+
+            print("6. Checking post existence")
+            if post_id not in self.posts_database:
+                print(f"Post {post_id} not found")
+                return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Post does not exist"])
+
+            print("7. Checking user existence")
+            if email not in self.user_database and email not in self.writers_database:
+                print(f"User {email} not found")
+                return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["User does not exist"])
+
+            print("8. Setting up replication")
+            op = "LIKE_POST"
+            params = [post_id, email]
+            print("9. Calling replicate_command")
+            res = self.replicate_command(op, params)
+            print("10. Got replication result:", res)
+
+            if res == SUCCESS:
+                print("11. Success!")
+                return blog_pb2.Response(operation=blog_pb2.SUCCESS)
+            print("12. Failed to replicate")
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not replicate"])
+        except Exception as e:
+            print(f"ERROR in RPCLikePost: {str(e)}")
+            logging.error(f"ERROR in RPCLikePost: {str(e)}", exc_info=True)
+            return blog_pb2.Response(operation=blog_pb2.FAILURE, info=[f"Server error: {str(e)}"])
+
     def RPCUnlikePost(self, request, context):
         if self.raft_node.role != "leader":
             return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
@@ -1048,10 +1105,13 @@ class Server(blog_pb2_grpc.BlogServicer):
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not replicate"])
 
     def RPCGetAllPosts(self, request, context): 
+        print("RPC GET ALL POSTS")
         if self.raft_node.role != "leader":
+            print("Errors with the Leader in GetAllPosts")
             return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Not leader"])
         
         posts = list(self.posts_database.values())
+        print("Posts found", posts)
         return blog_pb2.Response(
             operation=blog_pb2.SUCCESS,
             posts=[post_obj.to_proto() for post_obj in posts]

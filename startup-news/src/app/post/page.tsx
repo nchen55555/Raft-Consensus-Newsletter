@@ -54,7 +54,7 @@ export default function PostPage() {
 
   const handleSubmit = async (values: { title: string; content: string }) => {
     try {
-      const response = await fetch('http://localhost:8000/api/create-post', {
+      const response = await fetch('http://10.250.89.39:8000/api/create-post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

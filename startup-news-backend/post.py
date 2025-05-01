@@ -1,15 +1,15 @@
 from datetime import datetime
-from protos import blog_pb2
+from protos import blog_pb2, Comment
 
 class Post:
-    def __init__(self, author, title, content, likes=None, post_id=None, timestamp=None):
+    def __init__(self, author, title, content, likes=None, post_id=None, timestamp=None, comments=None):
         self.author = author
         self.title = title
         self.content = content
         self.timestamp = timestamp or datetime.now()
         self.likes = likes if likes is not None else []
         self.post_id = post_id
-        self.comments = []
+        self.comments = comments if comments is not None else []
         
     def to_dict(self):
         return {
