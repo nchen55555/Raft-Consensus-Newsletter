@@ -10,7 +10,7 @@ from concurrent import futures
 from datetime import datetime
 import uuid
 from email_validator import validate_email, EmailNotValidError
-# from email_queue import email_worker
+from email_queue import email_worker
 
 from protos import blog_pb2, blog_pb2_grpc
 from user import User
@@ -64,7 +64,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         self.comments_store = replica_config["comments_store"]
         # self.subscriptions_store = replica_config["subscriptions_store"]
 
-        # email_worker.start()
+        email_worker.start()
         # Blog data
         self.user_database = {}
         self.posts_database = {}  # post_id -> Post
@@ -96,7 +96,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         self.reset_election_timer()
 
         # Start email worker
-        # email_worker.start()
+        email_worker.start()
 
     def get_cluster_stubs(self):
         # Refresh stubs for replicas that might have restarted
@@ -166,7 +166,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         if self.heartbeat_timer:
             self.heartbeat_timer.cancel()
             
-        # email_worker.stop()
+        email_worker.stop()
 
     # --------------------------------------------------------------------------
     # Raft roles - unchanged from original implementation
@@ -556,12 +556,6 @@ class Server(blog_pb2_grpc.BlogServicer):
             )
             
             self.posts_database[post_id] = post
-            
-            # if post_id not in [author].posts:
-            #     self.user_database[author].posts.append(post_id)
-            
-            # Notify followers via email
-            # self.notify_followers_of_new_post(author, post)
                 
         elif op == "LIKE_POST":
             if len(params) < 2:
@@ -619,30 +613,30 @@ class Server(blog_pb2_grpc.BlogServicer):
             rid = params[0]
             self.remove_replica_local(rid)
 
-    # def notify_followers_of_new_post(self, author, post):
-    #     if self.raft_node.role != "leader":
-    #         return
+    def notify_followers_of_new_post(self, author, post):
+        if self.raft_node.role != "leader":
+            return
         
-    #     followers = self.user_database[author].followers
-    #     for follower in followers:
-    #         if follower in self.user_database:
-    #             subject = f"New Post from {author}: {post.title}"
-    #             content = f"""
-    #             {author} has published a new post:
+        followers = self.user_database[author].followers
+        for follower in followers:
+            if follower in self.user_database:
+                subject = f"New Post from {author}: {post.title}"
+                content = f"""
+                {author} has published a new post:
                 
-    #             {post.title}
+                {post.title}
                 
-    #             {post.content[:200]}{'...' if len(post.content) > 200 else ''}
+                {post.content[:200]}{'...' if len(post.content) > 200 else ''}
                 
-    #             View the full post on our platform.
-    #             """
-    #             # Queue the email
-    #             email_worker.queue_email(
-    #                 author,
-    #                 follower,
-    #                 subject,
-    #                 content
-    #             )
+                View the full post on our platform.
+                """
+                # Queue the email
+                email_worker.queue_email(
+                    author,
+                    follower,
+                    subject,
+                    content
+                )
 
     def add_replica_local(self, new_cfg):
         arr = get_replicas_config()
@@ -831,7 +825,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         print("RPCCreatePost called 7: " + str(success))
         if success == SUCCESS:
             # Notify followers via email
-            # self.notify_followers_of_new_post(author, post)
+            self.notify_followers_of_new_post(author, post)
             print("RPCCreatePost called 8")
             return blog_pb2.Response(operation=blog_pb2.SUCCESS)
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Failed to replicate post"])
