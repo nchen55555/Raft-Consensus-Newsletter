@@ -47,11 +47,20 @@ def find_leader_stub():
             continue
     return None
 
+# Global server instance
+_server_instance = None
+
+def get_server_instance():
+    global _server_instance
+    return _server_instance
+
 class Server(blog_pb2_grpc.BlogServicer):
     ELECTION_TIMEOUT = random.uniform(3.0, 5.0)
     HEARTBEAT_INTERVAL = 1.5
 
     def __init__(self, replica_config):
+        global _server_instance
+        _server_instance = self
         print("Creating new Server instance")
         self.replica_id = replica_config["id"]
         print(f"Server instance created for replica {self.replica_id}")
@@ -1187,6 +1196,10 @@ class Server(blog_pb2_grpc.BlogServicer):
         if res == SUCCESS:
             return blog_pb2.Response(operation=blog_pb2.SUCCESS)
         return blog_pb2.Response(operation=blog_pb2.FAILURE, info=["Could not replicate"])
+
+    def is_leader(self):
+        """Check if this server is currently the leader"""
+        return self.raft_node.role == "leader"
 
 if __name__ == "__main__":
     import argparse

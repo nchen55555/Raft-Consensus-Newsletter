@@ -57,7 +57,7 @@ export default function PostPage() {
   const handleSubmit = async (values: { title: string; content: string }) => {
     setLoading(true);
     try {
-      const response = await apiClient.request('/create-post', {
+      const response = await apiClient.request('/api/create-post', {
         method: 'POST',
         body: JSON.stringify({
           ...values,

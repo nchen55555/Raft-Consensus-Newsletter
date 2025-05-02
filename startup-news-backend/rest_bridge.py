@@ -4,7 +4,7 @@ from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 import grpc
 from protos import blog_pb2, blog_pb2_grpc
-from server import find_leader_stub
+from server import find_leader_stub, get_server_instance
 from email_validator import validate_email, EmailNotValidError
 from fastapi import Query
 
@@ -273,3 +273,13 @@ def like_post(req: LikeRequest):
         print("Traceback:")
         print(traceback.format_exc())
         return {"success": False, "error": f"Server error: {str(e)}"}
+
+@app.get("/api/leader-info")
+async def leader_info():
+    server = get_server_instance()
+    print("DEBUG: Server instance:", server)
+    if server:
+        print("DEBUG: Server role:", server.raft_node.role)
+    if not server:
+        return {"isLeader": False}  # If no server instance, we're definitely not the leader
+    return {"isLeader": server.is_leader()}
