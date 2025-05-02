@@ -31,13 +31,18 @@ FAILURE = 1
 def find_leader_stub():
     """Find the current leader and return a gRPC stub to communicate with it"""
     replicas = get_replicas_config()
+    print("Trying to find leader among replicas:", replicas)
     for r in replicas:
         try:
+            print(f"Attempting to contact replica {r['id']} at {r['host']}:{r['port']}")
             channel = grpc.insecure_channel(f"{r['host']}:{r['port']}")
             stub = blog_pb2_grpc.BlogStub(channel)
+            print(f"Created stub for {r['id']}, getting leader info...")
             resp = stub.RPCGetLeaderInfo(blog_pb2.Request(), timeout=2.0)
+            print(f"Got response from {r['id']}:", resp)
             if resp.operation == blog_pb2.SUCCESS and resp.info:
                 leader_id = resp.info[0]
+                print(f"Found leader: {leader_id}")
                 leader_cfg = next((cfg for cfg in replicas if cfg["id"] == leader_id), None)
                 if leader_cfg:
                     leader_channel = grpc.insecure_channel(f"{leader_cfg['host']}:{leader_cfg['port']}")
@@ -45,6 +50,7 @@ def find_leader_stub():
         except Exception as e:
             print("Failed to contact replica:", r, "Error:", e)
             continue
+    print("No leader found after trying all replicas")
     return None
 
 # Global server instance
@@ -149,16 +155,21 @@ class Server(blog_pb2_grpc.BlogServicer):
         return self._stubs_cache
 
     def reset_election_timer(self):
+        print("\n=== RESETTING ELECTION TIMER ===")
+        print(f"Current role: {self.raft_node.role}")
+        print(f"Current term: {self.raft_node.currentTerm}")
         # cancel any existing timer
         if self.election_timer:
+            print("Cancelling existing timer")
             self.election_timer.cancel()
 
         # pick a uniform random timeout between 3 and 5 seconds
         timeout = random.uniform(3.0, 5.0)
         self.ELECTION_TIMEOUT = timeout
-        logging.info(f"Election timeout set to {timeout:.2f}s")
+        print(f"Election timeout set to {timeout:.2f}s")
 
         # when it fires, try to become candidate
+        print("Starting new election timer")
         self.election_timer = threading.Timer(timeout, self.become_candidate)
         self.election_timer.start()
 
@@ -183,13 +194,18 @@ class Server(blog_pb2_grpc.BlogServicer):
     def become_candidate(self):
         if self.raft_node.role == "leader":
             return
+        print(f"\n=== STARTING ELECTION ===")
+        print(f"Current term: {self.raft_node.currentTerm}")
+        print(f"Current role: {self.raft_node.role}")
         self.raft_node.role = "candidate"
         self.raft_node.currentTerm += 1
         self.raft_node.votedFor = self.replica_id
         self.raft_node.save_raft_state()
+        print(f"Became candidate for term {self.raft_node.currentTerm}")
 
         votes_granted = 1
         cluster_stubs = self.get_cluster_stubs()
+        print(f"Got cluster stubs: {len(cluster_stubs)} other replicas")
         self.reset_election_timer()
 
         def request_vote_async(stub):
@@ -200,13 +216,16 @@ class Server(blog_pb2_grpc.BlogServicer):
                     lastLogIndex=self.raft_node.last_log_index(),
                     lastLogTerm=self.raft_node.last_log_term()
                 )
+                print(f"Requesting vote with term={req.term}, lastLogIndex={req.lastLogIndex}, lastLogTerm={req.lastLogTerm}")
                 return stub.RequestVote(req, timeout=2.0)
-            except:
+            except Exception as e:
+                print(f"Failed to request vote: {e}")
                 return None
 
         threads = []
         results = []
         for rid, stub in cluster_stubs.items():
+            print(f"Starting vote request thread for replica {rid}")
             t = threading.Thread(target=lambda stub=stub: results.append(request_vote_async(stub)))
             t.start()
             threads.append(t)
@@ -214,10 +233,14 @@ class Server(blog_pb2_grpc.BlogServicer):
             t.join()
 
         currentTerm = self.raft_node.currentTerm
+        print(f"\nProcessing {len(results)} vote results:")
         for r in results:
             if not r:
+                print("Got None response")
                 continue
+            print(f"Got response: term={r.term}, voteGranted={r.voteGranted}")
             if r.term > currentTerm:
+                print(f"Found higher term {r.term}, becoming follower")
                 self.raft_node.role = "follower"
                 self.raft_node.currentTerm = r.term
                 self.raft_node.votedFor = None
@@ -225,12 +248,15 @@ class Server(blog_pb2_grpc.BlogServicer):
                 return
             if r.voteGranted:
                 votes_granted += 1
+                print(f"Got vote, now have {votes_granted} votes")
 
         majority = (len(self.replicas_config)//2)+1
+        print(f"Need {majority} votes for majority ({len(self.replicas_config)} total replicas)")
         if votes_granted >= majority:
+            print("Got majority, becoming leader")
             self.become_leader()
-        
         else:
+            print(f"Only got {votes_granted} votes, remaining candidate")
             self.reset_election_timer()
 
     def become_leader(self):
@@ -626,26 +652,25 @@ class Server(blog_pb2_grpc.BlogServicer):
         if self.raft_node.role != "leader":
             return
         
-        followers = self.user_database[author].followers
+        followers = self.user_database
         for follower in followers:
-            if follower in self.user_database:
-                subject = f"New Post from {author}: {post.title}"
-                content = f"""
-                {author} has published a new post:
-                
-                {post.title}
-                
-                {post.content[:200]}{'...' if len(post.content) > 200 else ''}
-                
-                View the full post on our platform.
-                """
-                # Queue the email
-                email_worker.queue_email(
-                    author,
-                    follower,
-                    subject,
-                    content
-                )
+            subject = f"New Post from {author}: {post.title}"
+            content = f"""
+            {author} has published a new post:
+            
+            {post.title}
+            
+            {post.content[:200]}{'...' if len(post.content) > 200 else ''}
+            
+            View the full post on our platform.
+            """
+            # Queue the email
+            email_worker.queue_email(
+                author,
+                follower,
+                subject,
+                content
+            )
 
     def add_replica_local(self, new_cfg):
         arr = get_replicas_config()
@@ -705,31 +730,49 @@ class Server(blog_pb2_grpc.BlogServicer):
         lastLogIndex = request.lastLogIndex
         lastLogTerm = request.lastLogTerm
 
+        print(f"\n=== RECEIVED VOTE REQUEST ===")
+        print(f"From candidate: {candId}")
+        print(f"Their term: {term}")
+        print(f"Our term: {self.raft_node.currentTerm}")
+        print(f"Our votedFor: {self.raft_node.votedFor}")
+        print(f"Our last log index: {self.raft_node.last_log_index()}")
+        print(f"Our last log term: {self.raft_node.last_log_term()}")
+        print(f"Their last log index: {lastLogIndex}")
+        print(f"Their last log term: {lastLogTerm}")
+
         # If our term is higher, reject immediately
         if term < self.raft_node.currentTerm:
+            print(f"Rejecting - our term {self.raft_node.currentTerm} is higher than {term}")
             return blog_pb2.Response(term=self.raft_node.currentTerm, voteGranted=False)
 
         # Update term if needed
         if term > self.raft_node.currentTerm:
+            print(f"Updating our term from {self.raft_node.currentTerm} to {term}")
             self.raft_node.currentTerm = term
             self.raft_node.votedFor = None
             self.raft_node.role = "follower"
             self.raft_node.save_raft_state()
 
-        # Check if we've already voted in this term
-        already_voted = self.raft_node.votedFor is not None and self.raft_node.votedFor != candId
-        
-        # Grant vote if we haven't voted yet and candidate's log is at least as up-to-date as ours
+        # Check if we can vote for this candidate
+        already_voted = (self.raft_node.votedFor is not None and 
+                        self.raft_node.votedFor != candId)
+        if already_voted:
+            print(f"Already voted for {self.raft_node.votedFor} this term")
+
         log_is_current = (lastLogTerm > self.raft_node.last_log_term() or 
                         (lastLogTerm == self.raft_node.last_log_term() and 
                         lastLogIndex >= self.raft_node.last_log_index()))
-        
+        if not log_is_current:
+            print(f"Log not current - candidate log ({lastLogTerm}, {lastLogIndex}) not newer than ours ({self.raft_node.last_log_term()}, {self.raft_node.last_log_index()})")
+
         if not already_voted and log_is_current:
+            print(f"Granting vote to {candId}")
             self.raft_node.votedFor = candId
             self.raft_node.save_raft_state()
             self.reset_election_timer()  # Reset timer when granting vote
             return blog_pb2.Response(term=self.raft_node.currentTerm, voteGranted=True)
-        
+
+        print(f"Vote denied")
         return blog_pb2.Response(term=self.raft_node.currentTerm, voteGranted=False)
 
     # AppendEntries RPC - Unchanged from original

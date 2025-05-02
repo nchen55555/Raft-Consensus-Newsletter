@@ -10,7 +10,7 @@ export default function Subscribe({ onSubscribed }: { onSubscribed?: (email: str
 
   const handleSubscribe = async () => {
     try {
-      const res = await apiClient.request("/api/subscribe", {
+      const res = await apiClient.request("/subscribe", {
         method: "POST",
         body: JSON.stringify({ email: email }),
       });

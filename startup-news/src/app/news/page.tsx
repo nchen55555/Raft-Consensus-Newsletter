@@ -55,7 +55,7 @@ export default function News() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await apiClient.request('/api/posts');
+        const response = await apiClient.request('/posts');
         if (!response.ok) throw new Error('Failed to fetch posts');
         const data = await response.json();
         setPosts(data || []); 
@@ -90,7 +90,7 @@ export default function News() {
       setVerifying(true);
       setVerifyError('');
       try {
-        const resp = await apiClient.request(`/api/search_user?email=${encodeURIComponent(verifyEmail)}`);
+        const resp = await apiClient.request(`/search_user?email=${encodeURIComponent(verifyEmail)}`);
         const result = await resp.json();
         if (result.success) {
           sessionStorage.setItem('startupnews_email', verifyEmail);
