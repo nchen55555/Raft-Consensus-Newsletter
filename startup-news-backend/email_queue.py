@@ -50,23 +50,24 @@
 #             except Exception as e:
 #                 self.logger.error(f"Error processing email queue: {e}")
 
-    # def _send_email(self, sender, recipient, subject, content):
-    #     # Construct the email
-    #     msg = MIMEMultipart()
-    #     msg['From']    = sender
-    #     msg['To']      = recipient
-    #     msg['Subject'] = subject
-    #     msg.attach(MIMEText(content, "plain"))
-    #     try:
-    #         with smtplib.SMTP(self.smtp_server, self.port, timeout=10) as server:
-    #             server.ehlo()
-    #             # Use STARTTLS if available
-    #             if server.has_extn('starttls'):
-    #                 server.starttls()
-    #                 server.ehlo()
-    #             # Perform login only if server supports AUTH
-    #             if self.username and self.password and server.has_extn('auth'):
-    #                 server.login(self.username, self.password)
+#     def _send_email(self, sender, recipient, subject, content):
+#         # Construct the email
+#         msg = MIMEMultipart()
+#         msg['From']    = sender
+#         msg['To']      = recipient
+#         msg['Subject'] = subject
+#         msg.attach(MIMEText(content, "plain"))
+
+#         try:
+#             with smtplib.SMTP("localhost", 1025, timeout=10) as server:
+#                 server.ehlo()
+#                 # Use STARTTLS if available
+#                 if server.has_extn('starttls'):
+#                     server.starttls()
+#                     server.ehlo()
+#                 # Perform login only if server supports AUTH
+#                 if self.username and self.password and server.has_extn('auth'):
+#                     server.login(self.username, self.password)
                 
 #                 server.send_message(msg)
 #                 self.logger.info(f"Email sent to {recipient}")
