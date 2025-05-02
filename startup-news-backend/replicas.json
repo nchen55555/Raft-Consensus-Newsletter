@@ -22,7 +22,7 @@
       },
       {
         "id": "replica3",
-        "host": "10.250.89.39",
+        "host": "10.250.243.174",
         "port": 5003,
         "raft_store": "replica3_raft.json",
         "posts_store": "replica_3_posts.csv",
@@ -32,7 +32,7 @@
       },
       {
         "id": "replica4",
-        "host": "10.250.89.39",
+        "host": "10.250.243.174",
         "port": 5004,
         "raft_store": "replica4_raft.json",
         "posts_store": "replica4_posts.csv",
@@ -42,7 +42,7 @@
       },
       {
         "id": "replica5",
-        "host": "10.250.89.39",
+        "host": "10.250.243.174",
         "port": 5005,
         "raft_store": "replica5_raft.json",
         "posts_store": "replica5_posts.csv",
