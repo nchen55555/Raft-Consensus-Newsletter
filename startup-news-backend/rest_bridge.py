@@ -16,6 +16,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",  # Local development
         "http://10.250.89.39:3000",  # Local network access
+        "http://10.250.243.174:3000" # Local network access
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -276,10 +277,11 @@ def like_post(req: LikeRequest):
 
 @app.get("/api/leader-info")
 async def leader_info():
-    server = get_server_instance()
-    print("DEBUG: Server instance:", server)
-    if server:
-        print("DEBUG: Server role:", server.raft_node.role)
-    if not server:
-        return {"isLeader": False}  # If no server instance, we're definitely not the leader
-    return {"isLeader": server.is_leader()}
+    try:
+        stub = find_leader_stub()
+        if stub:
+            return {"isLeader": True}  # If we found the leader, this endpoint is the leader
+        return {"isLeader": False}  # If we couldn't find a leader
+    except Exception as e:
+        print(f"Error in leader_info: {e}")
+        return {"isLeader": False}
