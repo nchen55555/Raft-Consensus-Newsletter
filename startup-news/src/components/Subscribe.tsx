@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Input } from 'antd';
 import { UserOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
+import { apiClient } from '@/services/apiClient';
 
 export default function Subscribe({ onSubscribed }: { onSubscribed?: (email: string) => void }) {
   const [email, setEmail] = useState('');
@@ -9,12 +10,9 @@ export default function Subscribe({ onSubscribed }: { onSubscribed?: (email: str
 
   const handleSubscribe = async () => {
     try {
-      const res = await fetch("http://10.250.89.39:8000/api/subscribe", {
+      const res = await apiClient.request("/subscribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email,
-        })
+        body: JSON.stringify({ email: email }),
       });
       const result = await res.json();
       if (result.success) {

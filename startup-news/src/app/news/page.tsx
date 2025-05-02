@@ -8,6 +8,7 @@ import { ClockCircleOutlined, UserOutlined, LikeOutlined } from '@ant-design/ico
 import ReactMarkdown from 'react-markdown';
 import Link from 'next/link';
 import Subscribe from '@/components/Subscribe';
+import { apiClient } from '@/services/apiClient';
 
 interface Comment {
   text: string;
@@ -54,7 +55,7 @@ export default function News() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://10.250.89.39:8000/api/posts');
+        const response = await apiClient.request('/posts');
         if (!response.ok) throw new Error('Failed to fetch posts');
         const data = await response.json();
         setPosts(data || []); 
@@ -89,7 +90,7 @@ export default function News() {
       setVerifying(true);
       setVerifyError('');
       try {
-        const resp = await fetch(`http://10.250.89.39:8000/api/search_user?email=${encodeURIComponent(verifyEmail)}`);
+        const resp = await apiClient.request(`/search_user?email=${encodeURIComponent(verifyEmail)}`);
         const result = await resp.json();
         if (result.success) {
           sessionStorage.setItem('startupnews_email', verifyEmail);

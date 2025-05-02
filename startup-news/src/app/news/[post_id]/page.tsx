@@ -1,74 +1,75 @@
 'use client';
 
-import React from 'react';
-import ReactMarkdown from 'react-markdown';
-import Navigation from '@/components/Navigation';
+import { apiClient } from '@/services/apiClient';
+import { useState, useEffect, useRef } from 'react';
+import { Card, Input, Button, notification } from 'antd';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
-import { useEffect, useState, useRef } from 'react';
-import { Input, Button, Space } from 'antd';
+import { Comment, Post } from '@/types';
+import ReactMarkdown from 'react-markdown';
+import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { HeartOutlined, HeartFilled } from '@ant-design/icons';
+import { motion } from 'framer-motion';
 
 export default function PostDetailPage() {
   const params = useParams();
-  const post_id = params.post_id;
-
-  const textAreaRef = useRef<TextAreaRef>(null);
-  const [commentTexts, setCommentTexts] = useState<{ [postId: string]: string }>({});
-  const [commentSubmitting, setCommentSubmitting] = useState<{ [postId: string]: boolean }>({});
-  const [comments, setComments] = useState<{ [postId: string]: { email: string; text: string; timestamp: string }[] }>({});
-  const commentInputRefs = useRef<{ [postId: string]: HTMLTextAreaElement | null }>({});
-
-  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
-
+  const post_id = params.post_id as string;
+  const { userEmail: sessionEmail } = useAuth();
   const router = useRouter();
-
-  const [post, setPost] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
+  const [post, setPost] = useState<Post | null>(null);
+  const [loading, setLoading] = useState(false);
   const [likeSubmitting, setLikeSubmitting] = useState(false);
+  const [commentSubmitting, setCommentSubmitting] = useState<Record<string, boolean>>({});
+  const [commentTexts, setCommentTexts] = useState<Record<string, string>>({});
+  const commentInputRefs = useRef<Record<string, TextAreaRef>>({});
+  const [api, contextHolder] = notification.useNotification();
 
   const fetchComments = async (postId: string) => {
     try {
       console.log(`Fetched Comments!`);
-      const response = await fetch(`http://10.250.89.39:8000/api/comments?post_id=${encodeURIComponent(postId)}`);
+      const response = await apiClient.request(`/comments?post_id=${encodeURIComponent(postId)}`);
       if (!response.ok) throw new Error('Failed to fetch comments');
       const data = await response.json();
-      setComments({
-        [postId]: data.comments || []
-      });
+      setCommentTexts(prev => ({ ...prev, [postId]: '' }));
+      if (post) {
+        setPost({
+          ...post,
+          comments: data.comments || []
+        });
+      }
     } catch (error) {
-      // Optionally handle error
+      console.error('Failed to fetch comments:', error);
     }
   };
 
   useEffect(() => {
-    const storedEmail = sessionStorage.getItem('startupnews_email');
-    setSessionEmail(storedEmail);
-    if (!storedEmail) {
-      router.replace('/news');
+    if (!sessionEmail) {
+      router.push('/login');
     }
-  }, [router]);
+  }, [router, sessionEmail]);
 
-  // useEffect(() => {
-  //   if (post_id) {
-  //     fetchComments(post_id as string);
-  //   }
-  // }, [post_id]);
+  useEffect(() => {
+    if (post_id) {
+      fetchComments(post_id);
+    }
+  }, [post_id]);
 
-  const handleAddComment = async (postId: string) => {
-    if (!sessionEmail || !commentTexts[postId]?.trim()) return;
-    setCommentSubmitting(prev => ({ ...prev, [postId]: true }));
-    console.log(`Adding comment...${postId}, ${sessionEmail}, ${commentTexts[postId]}`);
+  const handleAddComment = async (values: { text: string }) => {
+    if (!sessionEmail || !values.text.trim()) return;
+    
+    setCommentSubmitting(prev => ({
+      ...prev,
+      [post_id]: true
+    }));
+    
     try {
-      const response = await fetch('http://10.250.89.39:8000/api/comment', {
+      const response = await apiClient.request('/comment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          post_id: postId,
+          post_id: post_id,
           email: sessionEmail,
-          text: commentTexts[postId],
+          text: values.text,
           timestamp: new Date().toISOString()
         }),
       });
@@ -76,34 +77,41 @@ export default function PostDetailPage() {
       if (!response.ok) throw new Error('Failed to add comment');
 
       // Refresh the entire post to get updated comments
-      const postRes = await fetch(`http://10.250.89.39:8000/api/posts/${postId}`);
+      const postRes = await apiClient.request(`/posts/${post_id}`);
       if (!postRes.ok) throw new Error('Failed to fetch updated post');
       const updatedPost = await postRes.json();
       setPost(updatedPost);
-      if (updatedPost.comments) {
-        setComments(prev => ({
-          ...prev,
-          [updatedPost.post_id]: updatedPost.comments
-        }));
-      }
       
-      setCommentTexts(prev => ({ ...prev, [postId]: '' }));
+      // Clear comment text and focus input
+      setCommentTexts(prev => ({
+        ...prev,
+        [post_id]: ''
+      }));
+      
       // Optionally focus textarea again
-      commentInputRefs.current[postId]?.focus();
+      const inputRef = commentInputRefs.current[post_id];
+      if (inputRef) {
+        inputRef.focus();
+      }
     } catch (error) {
-      // Handle error (show notification, etc.)
+      api.error({
+        message: 'Error',
+        description: 'Failed to add comment',
+      });
     } finally {
-      setCommentSubmitting(prev => ({ ...prev, [postId]: false }));
+      setCommentSubmitting(prev => ({
+        ...prev,
+        [post_id]: false
+      }));
     }
   };
 
   const handleLike = async () => {
-    if (!sessionEmail) return;
+    if (!sessionEmail || !post) return;
     setLikeSubmitting(true);
     try {
-      const response = await fetch('http://10.250.89.39:8000/api/like', {
+      const response = await apiClient.request('/like', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           post_id: post.post_id,
           email: sessionEmail
@@ -113,12 +121,15 @@ export default function PostDetailPage() {
       if (!response.ok) throw new Error('Failed to like post');
 
       // Refresh post data to get updated likes
-      const postRes = await fetch(`http://10.250.89.39:8000/api/posts/${post.post_id}`);
+      const postRes = await apiClient.request(`/posts/${post.post_id}`);
       if (!postRes.ok) throw new Error('Failed to fetch updated post');
       const updatedPost = await postRes.json();
       setPost(updatedPost);
     } catch (error) {
-      // Handle error
+      api.error({
+        message: 'Error',
+        description: 'Failed to like post',
+      });
     } finally {
       setLikeSubmitting(false);
     }
@@ -128,98 +139,108 @@ export default function PostDetailPage() {
     // Fetch post data on mount
     const fetchPost = async () => {
       try {
-        const res = await fetch(`http://10.250.89.39:8000/api/posts/${post_id}`);
+        const res = await apiClient.request(`/posts/${post_id}`);
         if (!res.ok) throw new Error('Failed to fetch post');
         const data = await res.json();
         setPost(data);
-        // Set comments from the post data
-        if (data.comments) {
-          setComments(prev => ({
-            ...prev,
-            [data.post_id]: data.comments
-          }));
-        }
-      } catch (err) {
-        // handle error
-      } finally {
-        setLoading(false);
+      } catch (error) {
+        console.error('Failed to fetch post:', error);
       }
     };
-    fetchPost();
+
+    if (post_id) {
+      fetchPost();
+    }
   }, [post_id]);
 
-  if (loading) return <div>Loading...</div>;
-  if (!post) return <div>Post not found.</div>;
+  if (!post) return <div>Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
-      <div className="px-8 pt-8">
-        <Navigation />
-      </div>
-      <div className="py-20">
-        <div className="max-w-7xl mx-auto px-4">
-          <h1 className="text-3xl font-bold mb-4 text-black">{post.title}</h1>
-          <div className="mb-4 text-gray-700 text-base">
-            By {post.author} • {new Date(post.timestamp).toLocaleString()}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="container mx-auto px-4 py-8"
+    >
+      {contextHolder}
+      <Card className="w-full max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold mb-4">{post.title}</h1>
+          <div className="prose max-w-none">
+            <ReactMarkdown>{post.content}</ReactMarkdown>
           </div>
-          <div className="prose prose-lg text-black">
-            <div className="flex items-center gap-4 mb-4">
-              <Button 
+          <div className="mt-4 flex items-center justify-between text-gray-500">
+            <span>By {post.author}</span>
+            <div className="flex items-center gap-2">
+              <Button
                 type="text"
-                icon={post.likes?.includes(sessionEmail) ? <HeartFilled className="text-red-500" /> : <HeartOutlined />}
+                icon={post.likes.includes(sessionEmail || '') ? <HeartFilled /> : <HeartOutlined />}
                 onClick={handleLike}
                 loading={likeSubmitting}
-                disabled={!sessionEmail || likeSubmitting}
-                className="flex items-center"
               >
-                <span className="ml-1">{post.likes?.length || 0}</span>
+                {post.likes.length} likes
               </Button>
-            </div>
-            <ReactMarkdown>{post.content}</ReactMarkdown>
-            {/* Comments section */}
-            <div className="mt-8 border-t pt-6">
-              <h3 className="text-lg font-semibold mb-2">Comments</h3>
-              <div className="mb-4">
-                {(!post.comments || post.comments.length === 0) ? (
-                  <div className="text-gray-400 text-sm">No comments yet.</div>
-                ) : (
-                  <ul className="space-y-2">
-                    {post.comments.map((c: any, idx: number) => (
-                      <li key={idx} className="bg-gray-50 rounded px-3 py-2 text-left">
-                        <div>
-                          <span className="font-medium text-blue-700">{c.email}</span>
-                          <span className="text-gray-500 text-sm ml-2">• {new Date(c.timestamp).toLocaleString()}</span>
-                        </div>
-                        <div className="mt-1">{c.text}</div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <div className="flex items-end gap-2">
-                <Input.TextArea
-                  ref={textAreaRef}
-                  rows={2}
-                  value={commentTexts[post.post_id] || ''}
-                  onChange={e => setCommentTexts(prev => ({ ...prev, [post.post_id]: e.target.value }))}
-                  placeholder={sessionEmail ? 'Add a comment...' : 'Subscribe to comment'}
-                  disabled={!sessionEmail || commentSubmitting[post.post_id]}
-                  className="flex-1"
-                  maxLength={300}
-                />
-                <Button
-                  type="primary"
-                  onClick={() => handleAddComment(post.post_id)}
-                  disabled={!sessionEmail || !commentTexts[post.post_id]?.trim() || commentSubmitting[post.post_id]}
-                  loading={commentSubmitting[post.post_id]}
-                >
-                  Submit
-                </Button>
-              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4">Comments</h2>
+          {post.comments.map((comment, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
+              className="mb-4 p-4 bg-gray-50 rounded-lg"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-medium">{comment.email}</p>
+                  <p className="mt-1">{comment.text}</p>
+                </div>
+                <span className="text-sm text-gray-500">
+                  {new Date(comment.timestamp).toLocaleDateString()}
+                </span>
+              </div>
+            </motion.div>
+          ))}
+
+          <div className="mt-6">
+            <div className="mb-2">
+              {!sessionEmail && (
+                <p className="text-sm text-gray-500 mb-2">
+                  Please login to comment
+                </p>
+              )}
+            </div>
+            <div className="flex items-end gap-2">
+              <Input.TextArea
+                ref={(ref) => {
+                  if (ref) {
+                    commentInputRefs.current[post_id] = ref;
+                  }
+                }}
+                rows={2}
+                value={commentTexts[post_id] || ''}
+                onChange={e => setCommentTexts(prev => ({ ...prev, [post_id]: e.target.value }))}
+                placeholder={sessionEmail ? 'Add a comment...' : 'Subscribe to comment'}
+                disabled={!sessionEmail || commentSubmitting[post_id]}
+                className="flex-1"
+                maxLength={300}
+              />
+              <Button
+                type="primary"
+                onClick={() => handleAddComment({ text: commentTexts[post_id] || '' })}
+                disabled={!sessionEmail || !commentTexts[post_id]?.trim() || commentSubmitting[post_id]}
+                loading={commentSubmitting[post_id]}
+              >
+                Submit
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </motion.div>
   );
 }

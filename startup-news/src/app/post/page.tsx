@@ -6,6 +6,7 @@ import Navigation from '@/components/Navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { apiClient } from '@/services/apiClient';
 
 const { TextArea } = Input;
 
@@ -18,6 +19,7 @@ export default function PostPage() {
   const [api, contextHolder] = notification.useNotification();
   const [markdownContent, setMarkdownContent] = useState('');
   const [inputMode, setInputMode] = useState<InputMode>('manual');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     // Redirect to login if not authenticated
@@ -53,14 +55,13 @@ export default function PostPage() {
   };
 
   const handleSubmit = async (values: { title: string; content: string }) => {
+    setLoading(true);
     try {
-      const response = await fetch('http://10.250.89.39:8000/api/create-post', {
+      const response = await apiClient.request('/create-post', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: values.title,
-          content: values.content,
-          author: userEmail,
+          ...values,
+          email: sessionStorage.getItem('startupnews_email'),
         }),
       });
 
@@ -85,6 +86,8 @@ export default function PostPage() {
         message: 'Error',
         description: 'Failed to connect to server',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -171,6 +174,7 @@ export default function PostPage() {
                     type="primary"
                     htmlType="submit"
                     className="w-full py-3 px-4 rounded-lg bg-black text-white font-medium text-sm hover:bg-gray-800 transition-colors"
+                    loading={loading}
                   >
                     Publish Post
                   </Button>

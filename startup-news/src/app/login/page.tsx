@@ -8,6 +8,7 @@ import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { apiClient } from '@/services/apiClient';
 
 const ClientSideLoginForm = dynamic(() => Promise.resolve(({ children }: { children: React.ReactNode }) => <>{children}</>), { ssr: false });
 
@@ -21,9 +22,8 @@ export default function Login() {
   const handleLogin = async (values: { email: string; password: string }) => {
     setLoading(true);
     try {
-      const response = await fetch('http://10.250.89.39:8000/api/login', {
+      const response = await apiClient.request('/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       });
       
@@ -54,9 +54,8 @@ export default function Login() {
   const handleCreateAccount = async (values: { email: string; password: string; name: string }) => {
     setLoading(true);
     try {
-      const response = await fetch('http://10.250.89.39:8000/api/create-account', {
+      const response = await apiClient.request('/create-account', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       });
       
