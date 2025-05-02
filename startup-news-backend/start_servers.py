@@ -12,7 +12,7 @@ from protos import blog_pb2, blog_pb2_grpc
 def is_port_in_use(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.bind(('10.250.243.174', port))
+            s.bind(('10.250.89.39', port))
             return False
         except socket.error:
             return True

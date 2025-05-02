@@ -28,7 +28,7 @@ export default function PostDetailPage() {
   const fetchComments = async (postId: string) => {
     try {
       console.log(`Fetched Comments!`);
-      const response = await apiClient.request(`/comments?post_id=${encodeURIComponent(postId)}`);
+      const response = await apiClient.request(`/api/comments?post_id=${encodeURIComponent(postId)}`);
       if (!response.ok) throw new Error('Failed to fetch comments');
       const data = await response.json();
       setCommentTexts(prev => ({ ...prev, [postId]: '' }));
@@ -64,7 +64,7 @@ export default function PostDetailPage() {
     }));
     
     try {
-      const response = await apiClient.request('/comment', {
+      const response = await apiClient.request('/api/comment', {
         method: 'POST',
         body: JSON.stringify({
           post_id: post_id,
@@ -77,7 +77,7 @@ export default function PostDetailPage() {
       if (!response.ok) throw new Error('Failed to add comment');
 
       // Refresh the entire post to get updated comments
-      const postRes = await apiClient.request(`/posts/${post_id}`);
+      const postRes = await apiClient.request(`/api/posts/${post_id}`);
       if (!postRes.ok) throw new Error('Failed to fetch updated post');
       const updatedPost = await postRes.json();
       setPost(updatedPost);
@@ -110,7 +110,7 @@ export default function PostDetailPage() {
     if (!sessionEmail || !post) return;
     setLikeSubmitting(true);
     try {
-      const response = await apiClient.request('/like', {
+      const response = await apiClient.request('/api/like', {
         method: 'POST',
         body: JSON.stringify({
           post_id: post.post_id,
@@ -121,7 +121,7 @@ export default function PostDetailPage() {
       if (!response.ok) throw new Error('Failed to like post');
 
       // Refresh post data to get updated likes
-      const postRes = await apiClient.request(`/posts/${post.post_id}`);
+      const postRes = await apiClient.request(`/api/posts/${post.post_id}`);
       if (!postRes.ok) throw new Error('Failed to fetch updated post');
       const updatedPost = await postRes.json();
       setPost(updatedPost);
@@ -139,7 +139,7 @@ export default function PostDetailPage() {
     // Fetch post data on mount
     const fetchPost = async () => {
       try {
-        const res = await apiClient.request(`/posts/${post_id}`);
+        const res = await apiClient.request(`/api/posts/${post_id}`);
         if (!res.ok) throw new Error('Failed to fetch post');
         const data = await res.json();
         setPost(data);
