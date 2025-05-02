@@ -57,11 +57,11 @@ export default function PostPage() {
   const handleSubmit = async (values: { title: string; content: string }) => {
     setLoading(true);
     try {
-      const response = await apiClient.request('/api/create-post', {
+      const response = await apiClient.request('/create-post', {
         method: 'POST',
         body: JSON.stringify({
           ...values,
-          email: sessionStorage.getItem('startupnews_email'),
+          author: sessionStorage.getItem('startupnews_email'),
         }),
       });
 
@@ -187,3 +187,4 @@ export default function PostPage() {
     </div>
   );
 }
+

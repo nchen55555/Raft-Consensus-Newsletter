@@ -22,7 +22,7 @@ export default function Login() {
   const handleLogin = async (values: { email: string; password: string }) => {
     setLoading(true);
     try {
-      const response = await apiClient.request('/api/login', {
+      const response = await apiClient.request('/login', {
         method: 'POST',
         body: JSON.stringify(values),
       });
@@ -54,7 +54,7 @@ export default function Login() {
   const handleCreateAccount = async (values: { email: string; password: string; name: string }) => {
     setLoading(true);
     try {
-      const response = await apiClient.request('/api/create-account', {
+      const response = await apiClient.request('/create-account', {
         method: 'POST',
         body: JSON.stringify(values),
       });

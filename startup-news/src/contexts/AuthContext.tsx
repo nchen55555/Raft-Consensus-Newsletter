@@ -24,23 +24,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check if user is logged in on mount
-    const email = localStorage.getItem('userEmail');
+    const email = sessionStorage.getItem('startupnews_email');  
     if (email) {
       setIsAuthenticated(true);
       setUserEmail(email);
     }
+
+    // Listen for storage events to sync state across tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'startupnews_email') {
+        if (e.newValue) {
+          setIsAuthenticated(true);
+          setUserEmail(e.newValue);
+        } else {
+          setIsAuthenticated(false);
+          setUserEmail(null);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const login = (email: string) => {
     setIsAuthenticated(true);
     setUserEmail(email);
-    localStorage.setItem('userEmail', email);
+    sessionStorage.setItem('startupnews_email', email);  
   };
 
   const logout = () => {
     setIsAuthenticated(false);
     setUserEmail(null);
-    localStorage.removeItem('userEmail');
+    sessionStorage.removeItem('startupnews_email');  
     router.push('/login');
   };
 
