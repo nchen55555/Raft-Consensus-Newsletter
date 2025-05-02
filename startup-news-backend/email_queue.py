@@ -59,7 +59,7 @@ class EmailWorker:
         msg.attach(MIMEText(content, "plain"))
 
         try:
-            with smtplib.SMTP("localhost", 1025, timeout=10) as server:
+            with smtplib.SMTP(self.smtp_server, self.port, timeout=10) as server:
                 server.ehlo()
                 # Use STARTTLS if available
                 if server.has_extn('starttls'):
