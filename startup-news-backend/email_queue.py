@@ -197,7 +197,6 @@ class EmailWorker:
         msg['To'] = recipient
         msg['Subject'] = subject
         msg.attach(MIMEText(content, "plain"))
-        print("HERE WE RE", self.smtp_server, self.port)
         try:
             with smtplib.SMTP(self.smtp_server, self.port, timeout=10) as server:
                 server.ehlo()
@@ -210,7 +209,6 @@ class EmailWorker:
                     server.login(self.username, self.password)
                 
                 server.send_message(msg)
-                print("AND HERE WE ARE NOT")
                 self.logger.info(f"Email sent to {recipient}")
                 return True
         except Exception as e:

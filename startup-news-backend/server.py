@@ -77,7 +77,6 @@ class Server(blog_pb2_grpc.BlogServicer):
         self.users_store = replica_config["users_store"]
         self.writers_store = replica_config["writers_store"]
         self.comments_store = replica_config["comments_store"]
-        # self.subscriptions_store = replica_config["subscriptions_store"]
 
         email_worker.start()
         # Blog data
@@ -656,12 +655,7 @@ class Server(blog_pb2_grpc.BlogServicer):
         for follower in followers:
             subject = f"New Post from {author}: {post.title}"
             content = f"""
-            {author} has published a new post:
-            
-            {post.title}
-            
-            {post.content[:200]}{'...' if len(post.content) > 200 else ''}
-            
+            {author} has published a new post about {post.title}. Come check it out on StartupNews!
             View the full post on our platform.
             """
             # Queue the email
