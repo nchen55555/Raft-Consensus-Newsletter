@@ -43,6 +43,8 @@ pip install -r requirements.txt
 brew install uvicorn           # serves the FastAPI bridge
 brew install mailhog           # fake SMTP inbox
 brew services run mailhog      # UI → http://localhost:8025
+brew install redis
+brew services run redis        # For the distributed email queue
 
 ```
 
