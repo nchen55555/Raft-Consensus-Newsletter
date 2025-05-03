@@ -36,7 +36,7 @@ Take a look at our paper [linked here](https://www.overleaf.com/read/qbzsgyrhykq
 ### Clone & install
 
 ```
-git clone https://github.com/your-org/StartupNews.git
+git clone https://github.com/your-org/Raft-Consensus-Newsletter.git
 cd StartupNews
 # back-end deps
 cd startup-news-backend
