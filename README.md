@@ -138,4 +138,9 @@ python test.py
 
 ### Notes
 
-To run the app fully, everywhere in the code where you put in your own host, e.g. localhost or something like 10.2...., you should replace it everywhere with the host of your own choosing, both in the backend and the frontend. Right now, the code is configured to our hosts.
+To run the app fully, you will need to define a `.env.local` file in `startup-news-backend` specifying the hosts and port that you want the front-end to hit for FastAPI. For example, with two machines, we specified the below: 
+```
+NEXT_PUBLIC_REPLICA_ENDPOINTS=http://10.250.243.174:8000/api,http://10.250.89.39:8000/api
+
+```
+This ensures that our application is fully distributed and can run on multiple different machines. To do so, you will need to also alter the `replicas.json` file to reflect which replicas you want to run on which hosts and then run those replicas accordingly on the respective host machine. For example, run `python start_servers.py --replicas replica1 replica2` on one machine and `python start_servers.py -- replicas replica3 replica4 replica5` on the other. You will also need to run FastAPI on each machine using the `uvicorn` command as stated above, specifying the host and the port ex. `uvicorn rest_bridge:app –reload –host 10.250.243.174 –port 8000`
