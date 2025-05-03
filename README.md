@@ -3,6 +3,9 @@
 This repository contains **StartupNews**, a full-stack blog platform with a **Raft-based gRPC back-end** and a **React front-end**.  
 It is designed to stay online even if some replicas crash, and it ships with a local mail queue for development e-mails.
 
+Take a look at our paper [linked here](https://www.overleaf.com/read/qbzsgyrhykqk#fcf0d7) if you'd like to learn more about our project! 
+
+
 ---
 
 ## Features
