@@ -60,6 +60,10 @@ cp .env.example .env
 # SMTP_PASSWORD=abcd efgh ijkl mnop # optional – only for real e-mail
 # default_sender=something@gmail.com
 # use_tls=True
+# REDIS_HOST=localhost
+# REDIS_PORT=6379
+# REDIS_PASSWORD=
+# REDIS_DB=0
 ```
 
 To start replicas, we can use
